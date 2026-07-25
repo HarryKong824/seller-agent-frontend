@@ -35,14 +35,6 @@ export const navGroups: NavGroup[] = [
         shortcut: ['k', 'k'],
         isActive: false,
         items: []
-      },
-      {
-        title: '聊天',
-        url: '/dashboard/chat',
-        icon: 'chat',
-        shortcut: ['c', 'c'],
-        isActive: false,
-        items: []
       }
     ]
   },
