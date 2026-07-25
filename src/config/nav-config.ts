@@ -28,14 +28,6 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         items: []
       },
-      {
-        title: '看板',
-        url: '/dashboard/kanban',
-        icon: 'kanban',
-        shortcut: ['k', 'k'],
-        isActive: false,
-        items: []
-      }
     ]
   },
   {
