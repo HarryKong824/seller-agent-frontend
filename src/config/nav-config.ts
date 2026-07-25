@@ -31,25 +31,6 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
-    label: '组件',
-    items: [
-      {
-        title: 'React Query',
-        url: '/dashboard/react-query',
-        icon: 'code',
-        isActive: false,
-        items: []
-      },
-      {
-        title: '图标',
-        url: '/dashboard/elements/icons',
-        icon: 'palette',
-        isActive: false,
-        items: []
-      }
-    ]
-  },
-  {
     label: '',
     items: [
       {
@@ -63,12 +44,6 @@ export const navGroups: NavGroup[] = [
             url: '/dashboard/profile',
             icon: 'profile',
             shortcut: ['m', 'm']
-          },
-          {
-            title: '通知',
-            url: '/dashboard/notifications',
-            icon: 'notification',
-            shortcut: ['n', 'n']
           },
           {
             title: '退出登录',

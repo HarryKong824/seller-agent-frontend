@@ -165,10 +165,6 @@ export default function AppSidebar() {
                     <Icons.account className='mr-2 h-4 w-4' />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/notifications')}>
-                    <Icons.notification className='mr-2 h-4 w-4' />
-                    Notifications
-                  </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
