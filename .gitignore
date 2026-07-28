@@ -13,6 +13,8 @@ pnpm-lock.yaml
 
 # next.js
 /.next/
+# 防复发：调试时 rename 出的 .next_* 变体也必须忽略（否则会被 Tailwind v4 源探测扫描，导致 dev 500）
+/.next*/
 /out/
 
 # production
