@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/sidebar';
 import { navGroups } from '@/config/nav-config';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useAuth } from '@/hooks/use-auth';
 import { useFilteredNavGroups } from '@/hooks/use-nav';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -37,6 +38,11 @@ export default function AppSidebar() {
   const { isOpen } = useMediaQuery();
   const router = useRouter();
   const filteredGroups = useFilteredNavGroups(navGroups);
+  const { user } = useAuth();
+
+  const displayName = user?.username ?? 'Guest';
+  const displayEmail = user?.email ?? 'Not signed in';
+  const avatarChar = displayName.charAt(0).toUpperCase();
 
   React.useEffect(() => {
     // Side effects based on sidebar state changes
@@ -130,11 +136,11 @@ export default function AppSidebar() {
                 }
               >
                 <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-sm font-medium'>
-                  A
+                  {avatarChar}
                 </div>
                 <div className='grid flex-1 text-left text-sm leading-tight'>
-                  <span className='truncate font-semibold'>Admin</span>
-                  <span className='truncate text-xs text-muted-foreground'>admin@example.com</span>
+                  <span className='truncate font-semibold'>{displayName}</span>
+                  <span className='truncate text-xs text-muted-foreground'>{displayEmail}</span>
                 </div>
                 <Icons.chevronsDown className='ml-auto size-4' />
               </DropdownMenuTrigger>
@@ -149,11 +155,11 @@ export default function AppSidebar() {
                     <div className='px-1 py-1.5'>
                       <div className='flex items-center gap-2'>
                         <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-sm font-medium'>
-                          A
+                          {avatarChar}
                         </div>
                         <div className='grid flex-1 text-sm leading-tight'>
-                          <span className='truncate font-semibold'>Admin</span>
-                          <span className='truncate text-xs'>admin@example.com</span>
+                          <span className='truncate font-semibold'>{displayName}</span>
+                          <span className='truncate text-xs'>{displayEmail}</span>
                         </div>
                       </div>
                     </div>
