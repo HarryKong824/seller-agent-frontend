@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -90,9 +89,9 @@ export default function SignInPage() {
 
         <div className='text-center text-sm text-muted-foreground'>
           <span>忘记密码？</span>{' '}
-          <Link href='#' className='text-primary hover:underline'>
+          <button type='button' className='text-primary hover:underline'>
             联系管理员
-          </Link>
+          </button>
         </div>
       </div>
     </div>
