@@ -1,9 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from '@/components/ui/accordion';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,13 +39,20 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   useCreateSession,
   useDeleteSession,
   useRenameSession,
+  useSendMessage,
+  useSession,
   useSessions
 } from '@/features/chat/api';
-import type { SessionResponse } from '@/features/chat/types';
+import type {
+  ChatSource,
+  MessageResponse,
+  SessionResponse
+} from '@/features/chat/types';
 import { useKnowledgeBases } from '@/features/knowledge/api';
 
 export default function ChatPage() {
@@ -50,12 +63,20 @@ export default function ChatPage() {
   const [renameTarget, setRenameTarget] = useState<SessionResponse | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SessionResponse | null>(null);
+  const [input, setInput] = useState('');
 
   const { data, isLoading } = useSessions();
   const { data: kbData } = useKnowledgeBases();
+  const { data: sessionData, isLoading: sessionLoading } = useSession(selectedSessionId);
   const createMutation = useCreateSession();
   const renameMutation = useRenameSession();
   const deleteMutation = useDeleteSession();
+  const sendMutation = useSendMessage();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [sessionData?.messages, sendMutation.isPending]);
 
   const handleCreate = async () => {
     try {
@@ -104,6 +125,21 @@ export default function ChatPage() {
       setDeleteTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '删除失败');
+    }
+  };
+
+  const handleSend = async () => {
+    if (!selectedSessionId || !input.trim()) return;
+    const query = input.trim();
+    setInput('');
+    try {
+      await sendMutation.mutateAsync({
+        sessionId: selectedSessionId,
+        data: { query }
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '发送失败');
+      setInput(query);
     }
   };
 
@@ -179,13 +215,80 @@ export default function ChatPage() {
         </ScrollArea>
       </div>
 
-      {/* 消息区域占位（Commit 3 实现） */}
-      <div className='flex flex-1 items-center justify-center'>
-        <div className='text-muted-foreground text-center'>
-          <Icons.chat className='mx-auto mb-2 size-12 opacity-30' />
-          <p className='text-sm'>请选择或创建会话</p>
+      {/* 消息区域 */}
+      {selectedSessionId === null ? (
+        <div className='flex flex-1 items-center justify-center'>
+          <div className='text-muted-foreground text-center'>
+            <Icons.chat className='mx-auto mb-2 size-12 opacity-30' />
+            <p className='text-sm'>请选择或创建会话</p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className='flex flex-1 flex-col'>
+          {/* 消息列表 */}
+          <div className='flex-1 overflow-y-auto'>
+            <div className='mx-auto max-w-3xl space-y-4 p-4'>
+              {sessionLoading ? (
+                <div className='flex h-32 items-center justify-center'>
+                  <Icons.spinner className='text-muted-foreground size-5 animate-spin' />
+                </div>
+              ) : sessionData?.messages?.length ? (
+                <>
+                  {sessionData.messages.map((msg) => (
+                    <MessageBubble key={msg.id} msg={msg} />
+                  ))}
+                  {sendMutation.isPending && (
+                    <div className='flex justify-start'>
+                      <div className='bg-muted flex items-center gap-2 rounded-lg px-3 py-2'>
+                        <Icons.spinner className='size-4 animate-spin' />
+                        <span className='text-muted-foreground text-sm'>
+                          AI 思考中...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className='text-muted-foreground flex h-32 items-center justify-center text-sm'>
+                  开始对话吧
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* 发送框 */}
+          <div className='border-t p-4'>
+            <div className='mx-auto flex max-w-3xl gap-2'>
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSend();
+                  }
+                }}
+                placeholder='输入消息，Enter 发送，Shift+Enter 换行'
+                disabled={sendMutation.isPending}
+                rows={1}
+                className='min-h-[40px] max-h-[120px] flex-1 resize-none'
+              />
+              <Button
+                onClick={handleSend}
+                disabled={sendMutation.isPending || !input.trim()}
+                size='icon'
+              >
+                {sendMutation.isPending ? (
+                  <Icons.spinner className='size-4 animate-spin' />
+                ) : (
+                  <Icons.send className='size-4' />
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 新建会话 Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -304,6 +407,51 @@ export default function ChatPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+/** 消息气泡组件：user 右对齐主色，assistant 左对齐灰色。 */
+function MessageBubble({ msg }: { msg: MessageResponse }) {
+  const isUser = msg.role === 'user';
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[80%] rounded-lg p-3 ${
+          isUser
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted'
+        }`}
+      >
+        <div className='whitespace-pre-wrap text-sm'>{msg.content}</div>
+        {!isUser && msg.sources && msg.sources.length > 0 && (
+          <SourcesAccordion sources={msg.sources} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 引用来源折叠列表：每个 source 可展开查看分块摘要。 */
+function SourcesAccordion({ sources }: { sources: ChatSource[] }) {
+  return (
+    <div className='mt-2 border-t border-border/30 pt-2'>
+      <div className='mb-1 text-xs opacity-70'>引用来源</div>
+      <Accordion className='w-full'>
+        {sources.map((src, i) => (
+          <AccordionItem key={i} value={`src-${i}`}>
+            <AccordionTrigger className='text-xs hover:no-underline'>
+              <span className='flex items-center gap-1'>
+                <span className='font-mono'>[{i + 1}]</span>
+                <span>{src.source || `文档#${src.doc_id}`}</span>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <pre className='text-xs whitespace-pre-wrap'>{src.snippet}</pre>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
     </div>
   );
 }
