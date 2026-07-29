@@ -15,6 +15,19 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    label: '知识库',
+    items: [
+      {
+        title: '知识库管理',
+        url: '/dashboard/knowledge',
+        icon: 'workspace',
+        isActive: false,
+        shortcut: ['k', 'k'],
+        items: []
+      }
+    ]
+  },
+  {
     label: '',
     items: [
       {
