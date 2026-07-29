@@ -28,6 +28,19 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    label: '对话',
+    items: [
+      {
+        title: 'AI 对话',
+        url: '/dashboard/chat',
+        icon: 'chat',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      }
+    ]
+  },
+  {
     label: '',
     items: [
       {
