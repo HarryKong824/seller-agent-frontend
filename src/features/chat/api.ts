@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
+  ChatSource,
   MessageCreateRequest,
   MessageCreateResponse,
   SessionCreateRequest,
@@ -13,6 +14,23 @@ import type {
 } from './types';
 
 const BASE = '/api/chat';
+
+/** SSE stream event from backend (see §4.1.1.1 event types). */
+export interface StreamEvent {
+  type: 'meta' | 'sources' | 'token' | 'done' | 'error';
+  /** Token delta (type=token). */
+  delta?: string;
+  /** Rewritten query (type=meta). */
+  rewritten_query?: string;
+  /** Sub-queries (type=meta). */
+  sub_queries?: string[];
+  /** Source list (type=sources, done). */
+  sources?: ChatSource[];
+  /** Final answer (type=done). */
+  answer?: string;
+  /** Error message (type=error). */
+  message?: string;
+}
 
 /** Fetch session list from BFF. */
 async function fetchSessions(): Promise<SessionListResponse> {
@@ -73,8 +91,8 @@ async function deleteSession(sessionId: number): Promise<void> {
   }
 }
 
-/** Send a message via BFF. */
-async function sendMessage(
+/** Send a message (non-streaming, used as fallback). */
+export async function sendMessage(
   sessionId: number,
   data: MessageCreateRequest
 ): Promise<MessageCreateResponse> {
@@ -90,6 +108,49 @@ async function sendMessage(
   return res.json();
 }
 
+/** Send a message via SSE streaming, calling onEvent for each parsed event. */
+export async function sendMessageStream(
+  sessionId: number,
+  data: MessageCreateRequest,
+  onEvent: (event: StreamEvent) => void
+): Promise<void> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/messages/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `发送消息失败: ${res.status}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('无法获取响应流');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data:')) continue;
+      const dataStr = trimmed.slice(5).trim();
+      if (dataStr) {
+        try {
+          onEvent(JSON.parse(dataStr) as StreamEvent);
+        } catch {
+          // skip malformed JSON
+        }
+      }
+    }
+  }
+}
+
 /** TanStack Query hook for session list. */
 export function useSessions() {
   return useQuery({
@@ -98,7 +159,7 @@ export function useSessions() {
   });
 }
 
-/** TanStack Query mutation for creating a session. */
+/** TanStack Query hook for creating a session. */
 export function useCreateSession() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -137,20 +198,6 @@ export function useDeleteSession() {
     mutationFn: deleteSession,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
-    }
-  });
-}
-
-/** TanStack Query mutation for sending a message. */
-export function useSendMessage() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, data }: { sessionId: number; data: MessageCreateRequest }) =>
-      sendMessage(sessionId, data),
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: ['chat-session', variables.sessionId]
-      });
     }
   });
 }

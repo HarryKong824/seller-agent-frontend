@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 import {
   Accordion,
   AccordionContent,
@@ -44,9 +46,10 @@ import {
   useCreateSession,
   useDeleteSession,
   useRenameSession,
-  useSendMessage,
   useSession,
-  useSessions
+  useSessions,
+  sendMessage,
+  sendMessageStream
 } from '@/features/chat/api';
 import type {
   ChatSource,
@@ -64,19 +67,22 @@ export default function ChatPage() {
   const [renameTitle, setRenameTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SessionResponse | null>(null);
   const [input, setInput] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingSources, setStreamingSources] = useState<ChatSource[]>([]);
 
+  const queryClient = useQueryClient();
   const { data, isLoading } = useSessions();
   const { data: kbData } = useKnowledgeBases();
   const { data: sessionData, isLoading: sessionLoading } = useSession(selectedSessionId);
   const createMutation = useCreateSession();
   const renameMutation = useRenameSession();
   const deleteMutation = useDeleteSession();
-  const sendMutation = useSendMessage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [sessionData?.messages, sendMutation.isPending]);
+  }, [sessionData?.messages, isStreaming, streamingContent]);
 
   const handleCreate = async () => {
     try {
@@ -132,15 +138,42 @@ export default function ChatPage() {
     if (!selectedSessionId || !input.trim()) return;
     const query = input.trim();
     setInput('');
+    setIsStreaming(true);
+    setStreamingContent('');
+    setStreamingSources([]);
+
+    // Try streaming first
+    let streamOk = false;
     try {
-      await sendMutation.mutateAsync({
-        sessionId: selectedSessionId,
-        data: { query }
+      await sendMessageStream(selectedSessionId, { query }, (event) => {
+        if (event.type === 'token' && event.delta) {
+          setStreamingContent((prev) => prev + event.delta!);
+        } else if (event.type === 'sources' && event.sources) {
+          setStreamingSources(event.sources);
+        }
       });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '发送失败');
-      setInput(query);
+      streamOk = true;
+      queryClient.invalidateQueries({
+        queryKey: ['chat-session', selectedSessionId]
+      });
+    } catch {
+      // stream failed, will fallback
     }
+
+    // Fallback to non-streaming on failure
+    if (!streamOk) {
+      try {
+        await sendMessage(selectedSessionId, { query });
+        queryClient.invalidateQueries({
+          queryKey: ['chat-session', selectedSessionId]
+        });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : '发送失败');
+        setInput(query);
+      }
+    }
+
+    setIsStreaming(false);
   };
 
   return (
@@ -237,15 +270,19 @@ export default function ChatPage() {
                   {sessionData.messages.map((msg) => (
                     <MessageBubble key={msg.id} msg={msg} />
                   ))}
-                  {sendMutation.isPending && (
-                    <div className='flex justify-start'>
-                      <div className='bg-muted flex items-center gap-2 rounded-lg px-3 py-2'>
-                        <Icons.spinner className='size-4 animate-spin' />
-                        <span className='text-muted-foreground text-sm'>
-                          AI 思考中...
-                        </span>
-                      </div>
-                    </div>
+                  {isStreaming && (
+                    <MessageBubble
+                      msg={{
+                        id: -1,
+                        sessionId: selectedSessionId,
+                        role: 'assistant',
+                        content: streamingContent || '...',
+                        sources:
+                          streamingSources.length > 0 ? streamingSources : null,
+                        kbId: null,
+                        createdAt: new Date().toISOString()
+                      }}
+                    />
                   )}
                 </>
               ) : (
@@ -270,16 +307,16 @@ export default function ChatPage() {
                   }
                 }}
                 placeholder='输入消息，Enter 发送，Shift+Enter 换行'
-                disabled={sendMutation.isPending}
+                disabled={isStreaming}
                 rows={1}
                 className='min-h-[40px] max-h-[120px] flex-1 resize-none'
               />
               <Button
                 onClick={handleSend}
-                disabled={sendMutation.isPending || !input.trim()}
+                disabled={isStreaming || !input.trim()}
                 size='icon'
               >
-                {sendMutation.isPending ? (
+                {isStreaming ? (
                   <Icons.spinner className='size-4 animate-spin' />
                 ) : (
                   <Icons.send className='size-4' />

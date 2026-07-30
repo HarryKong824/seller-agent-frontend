@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 /** Extract JWT from httpOnly cookie for forwarding to backend. */
@@ -17,12 +20,12 @@ function buildBackendUrl(path: string[]): string {
   return `${BACKEND_URL}/api/v1/chat/${pathStr}`;
 }
 
-/** Forward a request to the backend, returning the JSON response. */
+/** Forward a request to the backend. Handles SSE streams and JSON responses. */
 async function proxyRequest(
   req: NextRequest,
   method: string,
   path: string[]
-): Promise<NextResponse> {
+): Promise<NextResponse | Response> {
   const authHeader = getAuthHeader(req);
 
   if (Object.keys(authHeader).length === 0) {
@@ -57,6 +60,19 @@ async function proxyRequest(
   // 204 No Content (DELETE success)
   if (res.status === 204) {
     return new NextResponse(null, { status: 204 });
+  }
+
+  // SSE streaming: forward raw response body without reading/closing
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('text/event-stream')) {
+    return new Response(res.body, {
+      status: res.status,
+      headers: {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        'x-accel-buffering': 'no'
+      }
+    });
   }
 
   const data = await res.json();
