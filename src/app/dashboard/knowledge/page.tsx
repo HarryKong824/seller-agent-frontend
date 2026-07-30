@@ -199,7 +199,9 @@ export default function KnowledgePage() {
                         <TableCell className='text-muted-foreground max-w-[200px] truncate'>
                           {kb.description || '-'}
                         </TableCell>
-                        <TableCell className='text-muted-foreground'>{kb.ownerId}</TableCell>
+                        <TableCell className='text-muted-foreground'>
+                          {kb.ownerUsername ?? String(kb.ownerId)}
+                        </TableCell>
                         <TableCell className='text-muted-foreground'>
                           {format(new Date(kb.created_at), 'yyyy-MM-dd HH:mm')}
                         </TableCell>

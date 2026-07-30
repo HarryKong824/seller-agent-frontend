@@ -5,7 +5,8 @@ export interface KnowledgeBase {
   name: string;
   description: string | null;
   category: string;
-  ownerId: string;
+  ownerId: number;
+  ownerUsername?: string | null;
   created_at: string;
   updated_at: string;
 }
