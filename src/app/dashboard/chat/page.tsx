@@ -49,7 +49,8 @@ import {
   useSession,
   useSessions,
   sendMessage,
-  sendMessageStream
+  sendMessageStream,
+  suggestScripts
 } from '@/features/chat/api';
 import type {
   ChatSource,
@@ -284,7 +285,8 @@ export default function ChatPage() {
                           content: streamingQuery,
                           sources: null,
                           kbId: null,
-                          createdAt: new Date().toISOString()
+                          createdAt: new Date().toISOString(),
+                          suggestedScripts: null
                         }}
                       />
                       <MessageBubble
@@ -296,7 +298,8 @@ export default function ChatPage() {
                           sources:
                             streamingSources.length > 0 ? streamingSources : null,
                           kbId: null,
-                          createdAt: new Date().toISOString()
+                          createdAt: new Date().toISOString(),
+                          suggestedScripts: null
                         }}
                       />
                     </>
@@ -468,6 +471,23 @@ export default function ChatPage() {
 /** 消息气泡组件：user 右对齐主色，assistant 左对齐灰色。 */
 function MessageBubble({ msg }: { msg: MessageResponse }) {
   const isUser = msg.role === 'user';
+  const [scripts, setScripts] = useState<string[] | null>(
+    msg.suggestedScripts ?? null
+  );
+  const [loading, setLoading] = useState(false);
+
+  const handleSuggest = async () => {
+    setLoading(true);
+    try {
+      const res = await suggestScripts(msg.sessionId, msg.id);
+      setScripts(res.suggestedScripts ?? []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '获取推荐话术失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -480,6 +500,28 @@ function MessageBubble({ msg }: { msg: MessageResponse }) {
         <div className='whitespace-pre-wrap text-sm'>{msg.content}</div>
         {!isUser && msg.sources && msg.sources.length > 0 && (
           <SourcesAccordion sources={msg.sources} />
+        )}
+        {!isUser && (
+          <div className='mt-2 border-t border-border/30 pt-2'>
+            {scripts && scripts.length > 0 && (
+              <div className='mb-2 space-y-1'>
+                {scripts.map((s, i) => (
+                  <div key={i} className='text-xs opacity-80'>
+                    💡 {s}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button
+              size='sm'
+              variant='ghost'
+              className='h-6 px-2 text-xs'
+              onClick={() => void handleSuggest()}
+              disabled={loading}
+            >
+              {loading ? '生成中…' : '💡 推荐话术'}
+            </Button>
+          </div>
         )}
       </div>
     </div>

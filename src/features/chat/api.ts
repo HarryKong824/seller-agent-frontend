@@ -6,6 +6,7 @@ import type {
   ChatSource,
   MessageCreateRequest,
   MessageCreateResponse,
+  MessageResponse,
   SessionCreateRequest,
   SessionDetailResponse,
   SessionListResponse,
@@ -149,6 +150,22 @@ export async function sendMessageStream(
       }
     }
   }
+}
+
+/** 为某条 assistant 消息请求推荐销售话术（M4-2）。 */
+export async function suggestScripts(
+  sessionId: number,
+  messageId: number
+): Promise<MessageResponse> {
+  const res = await fetch(
+    `${BASE}/sessions/${sessionId}/messages/${messageId}/suggest-scripts`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `获取推荐话术失败: ${res.status}`);
+  }
+  return res.json();
 }
 
 /** TanStack Query hook for session list. */

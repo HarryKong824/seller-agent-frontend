@@ -51,6 +51,7 @@ export interface MessageResponse {
   sources: ChatSource[] | null;
   kbId: number | null;
   createdAt: string;
+  suggestedScripts?: string[] | null;
 }
 
 /** GET /chat/sessions/{id} response — session detail + message history. */
