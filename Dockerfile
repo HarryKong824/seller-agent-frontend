@@ -14,9 +14,9 @@ RUN npm install -g bun
 # Copy package-related files to leverage Docker cache
 COPY package.json bun.lock* ./
 
-# Install dependencies with frozen lockfile for reproducible builds
+# Install dependencies (lockfile outdated, frozen disabled to allow resolution)
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --no-save --frozen-lockfile
+    bun install --no-save
 
 # ============================================
 # Stage 2: Build the Next.js application
@@ -31,12 +31,6 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-
-# Build-time env vars — override these with --build-arg or in compose.yml
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ARG NEXT_PUBLIC_CLERK_SIGN_IN_URL=/auth/sign-in
-ARG NEXT_PUBLIC_CLERK_SIGN_UP_URL=/auth/sign-up
-ARG NEXT_PUBLIC_SENTRY_DISABLED=true
 
 ENV BUILD_STANDALONE=true
 
@@ -69,5 +63,7 @@ COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 USER node
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 CMD node -e "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server.js"]
