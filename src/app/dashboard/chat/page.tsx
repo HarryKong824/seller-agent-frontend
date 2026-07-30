@@ -70,6 +70,7 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingSources, setStreamingSources] = useState<ChatSource[]>([]);
+  const [streamingQuery, setStreamingQuery] = useState('');
 
   const queryClient = useQueryClient();
   const { data, isLoading } = useSessions();
@@ -141,6 +142,7 @@ export default function ChatPage() {
     setIsStreaming(true);
     setStreamingContent('');
     setStreamingSources([]);
+    setStreamingQuery(query);
 
     // Try streaming first
     let streamOk = false;
@@ -150,6 +152,8 @@ export default function ChatPage() {
           setStreamingContent((prev) => prev + event.delta!);
         } else if (event.type === 'sources' && event.sources) {
           setStreamingSources(event.sources);
+        } else if (event.type === 'error') {
+          toast.error(typeof event.message === 'string' ? event.message : '生成失败，请稍后重试');
         }
       });
       streamOk = true;
@@ -271,18 +275,31 @@ export default function ChatPage() {
                     <MessageBubble key={msg.id} msg={msg} />
                   ))}
                   {isStreaming && (
-                    <MessageBubble
-                      msg={{
-                        id: -1,
-                        sessionId: selectedSessionId,
-                        role: 'assistant',
-                        content: streamingContent || '...',
-                        sources:
-                          streamingSources.length > 0 ? streamingSources : null,
-                        kbId: null,
-                        createdAt: new Date().toISOString()
-                      }}
-                    />
+                    <>
+                      <MessageBubble
+                        msg={{
+                          id: -2,
+                          sessionId: selectedSessionId,
+                          role: 'user',
+                          content: streamingQuery,
+                          sources: null,
+                          kbId: null,
+                          createdAt: new Date().toISOString()
+                        }}
+                      />
+                      <MessageBubble
+                        msg={{
+                          id: -1,
+                          sessionId: selectedSessionId,
+                          role: 'assistant',
+                          content: streamingContent || '...',
+                          sources:
+                            streamingSources.length > 0 ? streamingSources : null,
+                          kbId: null,
+                          createdAt: new Date().toISOString()
+                        }}
+                      />
+                    </>
                   )}
                 </>
               ) : (
