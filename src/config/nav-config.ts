@@ -41,6 +41,19 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    label: '管理',
+    items: [
+      {
+        title: '用户管理',
+        url: '/dashboard/users',
+        icon: 'user',
+        isActive: false,
+        shortcut: ['u', 'u'],
+        items: []
+      }
+    ]
+  },
+  {
     label: '',
     items: [
       {
