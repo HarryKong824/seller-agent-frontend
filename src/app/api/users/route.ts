@@ -1,45 +1,43 @@
-// ============================================================
-// Route Handler — Users (list + create)
-// ============================================================
-// Used with Pattern 2 (Route Handlers + ORM) or Pattern 3 (BFF).
-//
-// Fullstack (ORM): Replace fakeUsers calls with your ORM
-//   const users = await db.query.users.findMany({ ... })
-//
-// BFF (proxy): Replace with fetch to your external backend
-//   const res = await fetch(`${BACKEND_URL}/users?${searchParams}`, {
-//     headers: { Authorization: `Bearer ${token}` }
-//   })
-//   return NextResponse.json(await res.json())
-//
-// Current: Mock (in-memory fake data for demo/prototyping)
-// ============================================================
-
-import { fakeUsers } from '@/constants/mock-api-users';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
-  const page = Number(searchParams.get('page') ?? 1);
-  const limit = Number(searchParams.get('limit') ?? 10);
-  const roles = searchParams.get('roles') ?? undefined;
-  const search = searchParams.get('search') ?? undefined;
-  const sort = searchParams.get('sort') ?? undefined;
+// BFF proxy: list users (GET) / create user (POST) → backend /api/v1/users.
+// Mirrors src/app/api/customers/route.ts: reads access_token httpOnly cookie
+// and forwards it as an Authorization: Bearer header to the backend.
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get('access_token')?.value;
 
-  const data = await fakeUsers.getUsers({
-    page,
-    limit,
-    roles,
-    search,
-    sort
+  if (!token) {
+    return NextResponse.json({ detail: '未登录' }, { status: 401 });
+  }
+
+  const res = await fetch(`${BACKEND_URL}/api/v1/users`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store'
   });
 
-  return NextResponse.json(data);
+  const data = await res.json();
+  return NextResponse.json(data, { status: res.status });
 }
 
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const data = await fakeUsers.createUser(body);
-  return NextResponse.json(data, { status: 201 });
+export async function POST(req: NextRequest) {
+  const token = req.cookies.get('access_token')?.value;
+
+  if (!token) {
+    return NextResponse.json({ detail: '未登录' }, { status: 401 });
+  }
+
+  const body = await req.text();
+  const res = await fetch(`${BACKEND_URL}/api/v1/users`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body
+  });
+
+  const data = await res.json();
+  return NextResponse.json(data, { status: res.status });
 }
