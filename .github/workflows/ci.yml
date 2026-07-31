@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-      - run: bun install
+          node-version: 22
+      - run: npm ci
       - run: npx tsc --noEmit
-      - run: bun run lint
-      - run: bun run build
+      - run: npx oxlint
+      - run: npm run build
