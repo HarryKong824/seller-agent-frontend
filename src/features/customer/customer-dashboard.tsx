@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { format } from 'date-fns';
 import {
   type ColumnDef,
@@ -18,6 +19,15 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
 import { Icons } from '@/components/icons';
 import {
   Table,
@@ -27,8 +37,10 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { useCustomers, useCustomerStats } from './api';
+import { useAuth } from '@/hooks/use-auth';
+import { useCustomers, useCustomerStats, useDeleteCustomer } from './api';
 import { GRADE_LABELS, STATUS_LABELS, type Customer } from './types';
+import { toast } from 'sonner';
 
 const gradeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
   A: 'default',
@@ -43,49 +55,109 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
   churned: 'destructive'
 };
 
-const columns: ColumnDef<Customer>[] = [
-  {
-    accessorKey: 'name',
-    header: '客户名称'
-  },
-  {
-    accessorKey: 'industry',
-    header: '行业'
-  },
-  {
-    accessorKey: 'grade',
-    header: '分级',
-    cell: ({ row }) => {
-      const grade = row.original.grade;
-      return <Badge variant={gradeVariant[grade] ?? 'outline'}>{grade}</Badge>;
+function DeleteCustomerButton({
+  customerId,
+  customerName
+}: {
+  customerId: number;
+  customerName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const mutation = useDeleteCustomer();
+
+  const handleDelete = async () => {
+    try {
+      await mutation.mutateAsync(customerId);
+      toast.success('客户已删除');
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
     }
-  },
-  {
-    accessorKey: 'status',
-    header: '状态',
-    cell: ({ row }) => {
-      const status = row.original.status;
-      return (
-        <Badge variant={statusVariant[status] ?? 'outline'}>
-          {STATUS_LABELS[status] ?? status}
-        </Badge>
-      );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant='outline' size='sm' className='text-destructive hover:text-destructive'>
+            删除
+          </Button>
+        }
+      />
+      <DialogContent className='sm:max-w-[400px]'>
+        <DialogHeader>
+          <DialogTitle>删除客户</DialogTitle>
+          <DialogDescription>确认删除客户「{customerName}」？此操作不可恢复。</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant='outline' onClick={() => setOpen(false)}>
+            取消
+          </Button>
+          <Button variant='destructive' onClick={handleDelete} disabled={mutation.isPending}>
+            {mutation.isPending ? <Icons.spinner className='mr-1 size-4 animate-spin' /> : null}
+            确认删除
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function getColumns(isAdmin: boolean): ColumnDef<Customer>[] {
+  return [
+    {
+      accessorKey: 'name',
+      header: '客户名称'
+    },
+    {
+      accessorKey: 'industry',
+      header: '行业'
+    },
+    {
+      accessorKey: 'grade',
+      header: '分级',
+      cell: ({ row }) => {
+        const grade = row.original.grade;
+        return <Badge variant={gradeVariant[grade] ?? 'outline'}>{grade}</Badge>;
+      }
+    },
+    {
+      accessorKey: 'status',
+      header: '状态',
+      cell: ({ row }) => {
+        const status = row.original.status;
+        return (
+          <Badge variant={statusVariant[status] ?? 'outline'}>
+            {STATUS_LABELS[status] ?? status}
+          </Badge>
+        );
+      }
+    },
+    {
+      accessorKey: 'ownerSales',
+      header: '负责销售'
+    },
+    {
+      accessorKey: 'lastFollowUpAt',
+      header: '最近跟进',
+      cell: ({ row }) => {
+        const date = row.original.lastFollowUpAt;
+        if (!date) return <span className='text-muted-foreground'>未跟进</span>;
+        return format(new Date(date), 'yyyy-MM-dd');
+      }
+    },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: ({ row }) =>
+        isAdmin ? (
+          <DeleteCustomerButton customerId={row.original.id} customerName={row.original.name} />
+        ) : (
+          <span className='text-muted-foreground text-xs'>—</span>
+        )
     }
-  },
-  {
-    accessorKey: 'ownerSales',
-    header: '负责销售'
-  },
-  {
-    accessorKey: 'lastFollowUpAt',
-    header: '最近跟进',
-    cell: ({ row }) => {
-      const date = row.original.lastFollowUpAt;
-      if (!date) return <span className='text-muted-foreground'>未跟进</span>;
-      return format(new Date(date), 'yyyy-MM-dd');
-    }
-  }
-];
+  ];
+}
 
 function StatsCards() {
   const { data, isLoading, isError } = useCustomerStats();
@@ -163,10 +235,12 @@ function StatsCards() {
 
 function CustomerTable() {
   const { data, isLoading, isError } = useCustomers(1, 20);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const table = useReactTable({
     data: data?.items ?? [],
-    columns,
+    columns: getColumns(isAdmin),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel()
   });
@@ -215,7 +289,7 @@ function CustomerTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className='text-muted-foreground h-24 text-center'>
+                <TableCell colSpan={7} className='text-muted-foreground h-24 text-center'>
                   暂无客户数据
                 </TableCell>
               </TableRow>

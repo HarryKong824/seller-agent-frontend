@@ -39,7 +39,8 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { useKnowledgeBases, useCreateKnowledgeBase } from '@/features/knowledge/api';
+import { useAuth } from '@/hooks/use-auth';
+import { useDeleteKnowledgeBase, useKnowledgeBases, useCreateKnowledgeBase } from '@/features/knowledge/api';
 import { CATEGORY_LABELS, type KnowledgeBaseCreate } from '@/features/knowledge/types';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -140,8 +141,54 @@ function CreateKbDialog() {
   );
 }
 
+function DeleteKbButton({ kbId, kbName }: { kbId: number; kbName: string }) {
+  const [open, setOpen] = useState(false);
+  const mutation = useDeleteKnowledgeBase();
+
+  const handleDelete = async () => {
+    try {
+      await mutation.mutateAsync(kbId);
+      toast.success('知识库已删除');
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant='outline' size='sm' className='text-destructive hover:text-destructive'>
+            删除
+          </Button>
+        }
+      />
+      <DialogContent className='sm:max-w-[400px]'>
+        <DialogHeader>
+          <DialogTitle>删除知识库</DialogTitle>
+          <DialogDescription>
+            确认删除「{kbName}」？该操作会级联删除其下所有文档与切片，且不可恢复。
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant='outline' onClick={() => setOpen(false)}>
+            取消
+          </Button>
+          <Button variant='destructive' onClick={handleDelete} disabled={mutation.isPending}>
+            {mutation.isPending ? <Icons.spinner className='mr-1 size-4 animate-spin' /> : null}
+            确认删除
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function KnowledgePage() {
   const { data, isLoading, isError } = useKnowledgeBases();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div className='flex flex-1 flex-col space-y-6'>
@@ -177,6 +224,7 @@ export default function KnowledgePage() {
                     <TableHead>描述</TableHead>
                     <TableHead>创建人</TableHead>
                     <TableHead>创建时间</TableHead>
+                    <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -205,11 +253,18 @@ export default function KnowledgePage() {
                         <TableCell className='text-muted-foreground'>
                           {format(new Date(kb.created_at), 'yyyy-MM-dd HH:mm')}
                         </TableCell>
+                        <TableCell>
+                          {isAdmin ? (
+                            <DeleteKbButton kbId={kb.id} kbName={kb.name} />
+                          ) : (
+                            <span className='text-muted-foreground text-xs'>—</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className='text-muted-foreground h-24 text-center'>
+                      <TableCell colSpan={6} className='text-muted-foreground h-24 text-center'>
                         暂无知识库，点击右上角创建
                       </TableCell>
                     </TableRow>
