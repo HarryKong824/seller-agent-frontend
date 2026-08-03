@@ -36,6 +36,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://sales_ai:sales_ai_dev@postgres:5432/sales_ai
       REDIS_URL: redis://redis:6379/0
+      # 本地开发可设 AUTO_SEED=1（在 .env 中），首次启动自动灌入 demo/admin 等演示数据；生产部署保持默认 0
+      AUTO_SEED: ${AUTO_SEED:-0}
     depends_on:
       postgres:
         condition: service_healthy
