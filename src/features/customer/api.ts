@@ -37,3 +37,23 @@ export function useCustomerStats() {
     queryFn: fetchCustomerStats
   });
 }
+
+/** Delete a customer via BFF (admin only, enforced by backend). */
+async function deleteCustomer(id: number): Promise<void> {
+  const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `删除客户失败: ${res.status}`);
+  }
+}
+
+/** TanStack Query mutation for deleting a customer. */
+export function useDeleteCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteCustomer,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }
+  });
+}

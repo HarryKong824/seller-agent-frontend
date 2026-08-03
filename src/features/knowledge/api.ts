@@ -125,3 +125,23 @@ export function useSearch(kbId: number) {
     mutationFn: (body: SearchRequest) => searchChunks(kbId, body)
   });
 }
+
+/** Delete a knowledge base via BFF (admin only, enforced by backend). */
+async function deleteKnowledgeBase(id: number): Promise<void> {
+  const res = await fetch(`/api/knowledge-bases/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `删除知识库失败: ${res.status}`);
+  }
+}
+
+/** TanStack Query mutation for deleting a knowledge base. */
+export function useDeleteKnowledgeBase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteKnowledgeBase,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['knowledge-bases'] });
+    }
+  });
+}
