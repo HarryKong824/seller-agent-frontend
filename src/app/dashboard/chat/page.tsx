@@ -58,12 +58,14 @@ import type {
   SessionResponse
 } from '@/features/chat/types';
 import { useKnowledgeBases } from '@/features/knowledge/api';
+import { useCustomers } from '@/features/customer/api';
 
 export default function ChatPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState('');
   const [createKbId, setCreateKbId] = useState<string>('none');
+  const [createCustomerId, setCreateCustomerId] = useState<string>('none');
   const [renameTarget, setRenameTarget] = useState<SessionResponse | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SessionResponse | null>(null);
@@ -76,6 +78,7 @@ export default function ChatPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useSessions();
   const { data: kbData } = useKnowledgeBases();
+  const { data: customerData } = useCustomers();
   const { data: sessionData, isLoading: sessionLoading } = useSession(selectedSessionId);
   const createMutation = useCreateSession();
   const renameMutation = useRenameSession();
@@ -89,14 +92,18 @@ export default function ChatPage() {
   const handleCreate = async () => {
     try {
       const kbId = createKbId !== 'none' ? Number(createKbId) : undefined;
+      const customerId =
+        createCustomerId !== 'none' ? Number(createCustomerId) : undefined;
       const session = await createMutation.mutateAsync({
         title: createTitle.trim() || undefined,
-        kbId
+        kbId,
+        customerId
       });
       toast.success('会话创建成功');
       setCreateOpen(false);
       setCreateTitle('');
       setCreateKbId('none');
+      setCreateCustomerId('none');
       setSelectedSessionId(session.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
@@ -377,6 +384,25 @@ export default function ChatPage() {
                   {kbData?.items?.map((kb) => (
                     <SelectItem key={kb.id} value={String(kb.id)}>
                       {kb.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <Label>关联客户</Label>
+              <Select
+                value={createCustomerId}
+                onValueChange={(v) => setCreateCustomerId(v ?? 'none')}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='none'>不关联</SelectItem>
+                  {customerData?.items?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

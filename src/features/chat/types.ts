@@ -10,6 +10,7 @@ Sources are stored as JSONB dicts with snake_case keys (doc_id, chunk_id, etc.).
 /** POST /chat/sessions request body. */
 export interface SessionCreateRequest {
   kbId?: number;
+  customerId?: number;
   title?: string;
 }
 
@@ -18,6 +19,7 @@ export interface SessionResponse {
   id: number;
   userId: string;
   kbId: number | null;
+  customerId: number | null;
   title: string | null;
   createdAt: string;
   updatedAt: string;
