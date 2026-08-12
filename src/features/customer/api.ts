@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { CustomerListResponse, CustomerStatsResponse } from './types';
+import type { Customer, CustomerListResponse, CustomerStatsResponse } from './types';
 
 /** Fetch paginated customer list from /api/customers. */
 async function fetchCustomers(page = 1, pageSize = 20): Promise<CustomerListResponse> {
@@ -35,6 +35,25 @@ export function useCustomerStats() {
   return useQuery({
     queryKey: ['customer-stats'],
     queryFn: fetchCustomerStats
+  });
+}
+
+/** Fetch a single customer by id from /api/customers/{id}. */
+async function fetchCustomer(id: number): Promise<Customer> {
+  const res = await fetch(`/api/customers/${id}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `获取客户详情失败: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** TanStack Query hook for a single customer's detail. */
+export function useCustomer(id: number) {
+  return useQuery({
+    queryKey: ['customer', id],
+    queryFn: () => fetchCustomer(id),
+    enabled: Number.isFinite(id) && id > 0
   });
 }
 
