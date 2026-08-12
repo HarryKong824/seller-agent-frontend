@@ -13,7 +13,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Icons } from '@/components/icons';
-import { useCustomer } from '@/features/customer/api';
+import { useCustomer, useCustomerKnowledgeBases, useCustomerSessions } from '@/features/customer/api';
 import { GRADE_LABELS, STATUS_LABELS, type Customer } from '@/features/customer/types';
 
 const gradeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
@@ -27,6 +27,13 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
   prospect: 'secondary',
   dormant: 'outline',
   churned: 'destructive'
+};
+
+const KB_CATEGORY_LABELS: Record<string, string> = {
+  product: '产品',
+  sales_script: '话术',
+  case: '案例',
+  faq: '问答'
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -47,6 +54,16 @@ export default function CustomerDetailPage() {
 
 function CustomerDetailContent({ id }: { id: number }) {
   const { data: customer, isLoading, isError } = useCustomer(id);
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError
+  } = useCustomerSessions(id);
+  const {
+    data: kbs,
+    isLoading: kbsLoading,
+    isError: kbsError
+  } = useCustomerKnowledgeBases(id);
 
   if (isLoading) {
     return (
@@ -137,6 +154,90 @@ function CustomerDetailContent({ id }: { id: number }) {
             <Field label='更新时间'>
               {format(new Date(c.updated_at), 'yyyy-MM-dd HH:mm')}
             </Field>
+          </div>
+        </Card>
+      </div>
+
+      <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+        {/* 关联会话 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>关联会话</CardTitle>
+            <CardDescription>与该客户相关的聊天会话</CardDescription>
+          </CardHeader>
+          <div className='px-6 pb-6'>
+            {sessionsLoading ? (
+              <div className='flex h-20 items-center justify-center'>
+                <Icons.spinner className='text-muted-foreground size-5 animate-spin' />
+              </div>
+            ) : sessionsError ? (
+              <p className='text-muted-foreground text-sm'>加载失败</p>
+            ) : sessions && sessions.items.length > 0 ? (
+              <div className='flex flex-col'>
+                {sessions.items.map((s) => (
+                  <Link
+                    key={s.id}
+                    href='/dashboard/chat'
+                    className='flex items-center justify-between border-b py-2.5 last:border-b-0 hover:bg-accent'
+                  >
+                    <div className='min-w-0'>
+                      <div className='truncate text-sm font-medium'>
+                        {s.title || `会话 #${s.id}`}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {format(new Date(s.updatedAt), 'yyyy-MM-dd HH:mm')}
+                      </div>
+                    </div>
+                    <Icons.chevronRight className='text-muted-foreground size-4' />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className='text-muted-foreground text-sm'>
+                暂无关联会话。可在「对话」页新建会话时选择关联此客户。
+              </p>
+            )}
+          </div>
+        </Card>
+
+        {/* 关联知识库 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>关联知识库</CardTitle>
+            <CardDescription>该客户会话使用过的知识库</CardDescription>
+          </CardHeader>
+          <div className='px-6 pb-6'>
+            {kbsLoading ? (
+              <div className='flex h-20 items-center justify-center'>
+                <Icons.spinner className='text-muted-foreground size-5 animate-spin' />
+              </div>
+            ) : kbsError ? (
+              <p className='text-muted-foreground text-sm'>加载失败</p>
+            ) : kbs && kbs.length > 0 ? (
+              <div className='flex flex-col'>
+                {kbs.map((kb) => (
+                  <Link
+                    key={kb.id}
+                    href={`/dashboard/knowledge/${kb.id}`}
+                    className='flex items-center justify-between border-b py-2.5 last:border-b-0 hover:bg-accent'
+                  >
+                    <div className='min-w-0'>
+                      <div className='truncate text-sm font-medium'>
+                        {kb.name}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {KB_CATEGORY_LABELS[kb.category] ?? kb.category}
+                      </div>
+                    </div>
+                    <Icons.chevronRight className='text-muted-foreground size-4' />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className='text-muted-foreground text-sm'>
+                暂无关联知识库。该客户的会话绑定知识库后将自动出现在此。
+              </p>
+            )}
           </div>
         </Card>
       </div>
