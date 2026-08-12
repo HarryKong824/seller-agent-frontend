@@ -41,6 +41,19 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    label: '销售',
+    items: [
+      {
+        title: '拜访打卡',
+        url: '/dashboard/visits',
+        icon: 'mapPin',
+        isActive: false,
+        shortcut: ['v', 'v'],
+        items: []
+      }
+    ]
+  },
+  {
     label: '管理',
     items: [
       {

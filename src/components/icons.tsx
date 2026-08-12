@@ -52,6 +52,7 @@ import {
   IconLock,
   IconLogin,
   IconLogout,
+  IconMapPin,
   IconMessage,
   IconMinus,
   IconMoon,
@@ -192,6 +193,7 @@ export const Icons = {
   sparkles: IconSparkles,
   badgeCheck: IconRosetteDiscountCheck,
   lock: IconLock,
+  mapPin: IconMapPin,
 
   // Data / Charts
   trendingDown: IconTrendingDown,
