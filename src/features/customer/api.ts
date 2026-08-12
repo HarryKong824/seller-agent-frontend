@@ -2,7 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { SessionListResponse } from '../chat/types';
+
 import type { Customer, CustomerListResponse, CustomerStatsResponse } from './types';
+
+/** Minimal KB shape returned by GET /customers/{id}/knowledge-bases. */
+export interface RelatedKnowledgeBase {
+  id: number;
+  name: string;
+  category: string;
+  description: string | null;
+}
 
 /** Fetch paginated customer list from /api/customers. */
 async function fetchCustomers(page = 1, pageSize = 20): Promise<CustomerListResponse> {
@@ -74,5 +84,37 @@ export function useDeleteCustomer() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['customers'] });
     }
+  });
+}
+
+/** TanStack Query hook for chat sessions linked to a customer. */
+export function useCustomerSessions(id: number) {
+  return useQuery({
+    queryKey: ['customer-sessions', id],
+    queryFn: async (): Promise<SessionListResponse> => {
+      const res = await fetch(`/api/customers/${id}/sessions`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `获取关联会话失败: ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: Number.isFinite(id) && id > 0
+  });
+}
+
+/** TanStack Query hook for KBs used by a customer's sessions. */
+export function useCustomerKnowledgeBases(id: number) {
+  return useQuery({
+    queryKey: ['customer-kbs', id],
+    queryFn: async (): Promise<RelatedKnowledgeBase[]> => {
+      const res = await fetch(`/api/customers/${id}/knowledge-bases`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `获取关联知识库失败: ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: Number.isFinite(id) && id > 0
   });
 }
