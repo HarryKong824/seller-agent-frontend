@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
+import Link from 'next/link';
 import {
   type ColumnDef,
   flexRender,
@@ -107,7 +108,19 @@ function getColumns(isAdmin: boolean): ColumnDef<Customer>[] {
   return [
     {
       accessorKey: 'name',
-      header: '客户名称'
+      header: '客户名称',
+      cell: ({ row }) => {
+        const id = row.original.id;
+        const name = row.original.name;
+        return (
+          <Link
+            href={`/dashboard/customers/${id}`}
+            className='text-foreground hover:underline font-medium'
+          >
+            {name}
+          </Link>
+        );
+      }
     },
     {
       accessorKey: 'industry',
