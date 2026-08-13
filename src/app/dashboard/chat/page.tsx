@@ -703,6 +703,7 @@ function MessageBubble({ msg }: { msg: MessageResponse }) {
     msg.suggestedScripts ?? null
   );
   const [loading, setLoading] = useState(false);
+  const [activeSource, setActiveSource] = useState<string | null>(null);
 
   const handleSuggest = async () => {
     setLoading(true);
@@ -725,9 +726,17 @@ function MessageBubble({ msg }: { msg: MessageResponse }) {
             : 'bg-muted'
         }`}
       >
-        <div className='whitespace-pre-wrap text-sm'>{msg.content}</div>
+        <div className='whitespace-pre-wrap text-sm'>
+          {renderAnswerWithCitations(msg.content, (n) =>
+            setActiveSource(`src-${n - 1}`)
+          )}
+        </div>
         {!isUser && msg.sources && msg.sources.length > 0 && (
-          <SourcesAccordion sources={msg.sources} />
+          <SourcesAccordion
+            sources={msg.sources}
+            activeValue={activeSource}
+            onActiveChange={setActiveSource}
+          />
         )}
         {!isUser && (
           <div className='mt-2 border-t border-border/30 pt-2'>
@@ -757,11 +766,30 @@ function MessageBubble({ msg }: { msg: MessageResponse }) {
 }
 
 /** 引用来源折叠列表：每个 source 可展开查看分块摘要。 */
-function SourcesAccordion({ sources }: { sources: ChatSource[] }) {
+function SourcesAccordion({
+  sources,
+  activeValue = null,
+  onActiveChange,
+}: {
+  sources: ChatSource[];
+  activeValue?: string | null;
+  onActiveChange?: (value: string | null) => void;
+}) {
   return (
     <div className='mt-2 border-t border-border/30 pt-2'>
       <div className='mb-1 text-xs opacity-70'>引用来源</div>
-      <Accordion className='w-full'>
+      <Accordion
+        className='w-full'
+        multiple
+        value={activeValue ? [activeValue] : []}
+        onValueChange={(value) =>
+          onActiveChange?.(
+            Array.isArray(value) && value.length > 0
+              ? String(value[value.length - 1])
+              : null
+          )
+        }
+      >
         {sources.map((src, i) => (
           <AccordionItem key={i} value={`src-${i}`}>
             <AccordionTrigger className='text-xs hover:no-underline'>
@@ -778,4 +806,34 @@ function SourcesAccordion({ sources }: { sources: ChatSource[] }) {
       </Accordion>
     </div>
   );
+}
+
+/** 将回答中的 [n] 引用标记渲染为可点击徽标（线B⑦ 引用溯源）。
+ *
+ * 点击 [n] 触发 onCite(n)，由调用方展开对应来源条目（值 `src-${n-1}`）。
+ * 仅匹配 `[数字]`，如 "[可选]" 之类的中括号文本不受影响。
+ */
+function renderAnswerWithCitations(
+  content: string,
+  onCite: (n: number) => void
+) {
+  const parts = content.split(/(\[\d+\])/g);
+  return parts.map((part, i) => {
+    const match = part.match(/^\[(\d+)\]$/);
+    if (match) {
+      const n = Number(match[1]);
+      return (
+        <button
+          key={i}
+          type='button'
+          onClick={() => onCite(n)}
+          title={`查看引用来源 ${n}`}
+          className='mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded bg-primary/15 px-1 align-middle font-mono text-[10px] text-primary hover:bg-primary/30'
+        >
+          {match[1]}
+        </button>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
