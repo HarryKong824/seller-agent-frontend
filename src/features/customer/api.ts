@@ -186,23 +186,26 @@ export function useDeleteContact(id: number) {
 export function useUpdateCustomer360(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: {
-      health_score?: number | null;
-      renewal_date?: string | null;
-      status?: string;
-      last_follow_up_at?: string | null;
-    }): Promise<Customer> => {
-      const res = await fetch(`/api/customers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `更新客户失败: ${res.status}`);
-      }
-      return res.json();
-    },
+  mutationFn: async (payload: {
+    health_score?: number | null;
+    renewal_date?: string | null;
+    status?: string;
+    last_follow_up_at?: string | null;
+    stage?: string | null;
+    deal_amount?: number | null;
+    expected_close_date?: string | null;
+  }): Promise<Customer> => {
+    const res = await fetch(`/api/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `更新客户失败: ${res.status}`);
+    }
+    return res.json();
+  },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['customer', id] });
     }
