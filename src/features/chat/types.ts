@@ -75,3 +75,13 @@ export interface MessageCreateResponse {
   rewrittenQuery?: string;
   subQueries?: string[];
 }
+
+/** POST /chat/sessions/{id}/summarize response (线 B② AI 自动内务). */
+export interface SessionSummaryResponse {
+  customer: string;
+  summary: string;
+  keyPoints: string[];
+  nextSteps: string[];
+  followUpEmailSubject: string;
+  followUpEmailBody: string;
+}

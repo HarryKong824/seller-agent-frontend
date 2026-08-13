@@ -11,7 +11,8 @@ import type {
   SessionDetailResponse,
   SessionListResponse,
   SessionRenameRequest,
-  SessionResponse
+  SessionResponse,
+  SessionSummaryResponse
 } from './types';
 
 const BASE = '/api/chat';
@@ -168,6 +169,21 @@ export async function suggestScripts(
   return res.json();
 }
 
+/** 生成会话结构化活动记录 + 跟进邮件草稿（线 B② AI 自动内务）。 */
+export async function summarizeSession(
+  sessionId: number
+): Promise<SessionSummaryResponse> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/summarize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `生成失败: ${res.status}`);
+  }
+  return res.json();
+}
+
 /** TanStack Query hook for session list. */
 export function useSessions() {
   return useQuery({
@@ -216,5 +232,12 @@ export function useDeleteSession() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
     }
+  });
+}
+
+/** TanStack Query mutation for summarizing a session (线 B②). */
+export function useSummarizeSession() {
+  return useMutation({
+    mutationFn: (sessionId: number) => summarizeSession(sessionId)
   });
 }
