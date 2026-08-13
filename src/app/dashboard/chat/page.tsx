@@ -48,6 +48,7 @@ import {
   useRenameSession,
   useSession,
   useSessions,
+  useSummarizeSession,
   sendMessage,
   sendMessageStream,
   suggestScripts
@@ -55,7 +56,8 @@ import {
 import type {
   ChatSource,
   MessageResponse,
-  SessionResponse
+  SessionResponse,
+  SessionSummaryResponse
 } from '@/features/chat/types';
 import { useKnowledgeBases } from '@/features/knowledge/api';
 import { useCustomers } from '@/features/customer/api';
@@ -69,6 +71,11 @@ export default function ChatPage() {
   const [renameTarget, setRenameTarget] = useState<SessionResponse | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SessionResponse | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryData, setSummaryData] = useState<SessionSummaryResponse | null>(
+    null
+  );
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
@@ -83,7 +90,30 @@ export default function ChatPage() {
   const createMutation = useCreateSession();
   const renameMutation = useRenameSession();
   const deleteMutation = useDeleteSession();
+  const summarizeMutation = useSummarizeSession();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleSummarize = async () => {
+    if (selectedSessionId === null) return;
+    try {
+      const data = await summarizeMutation.mutateAsync(selectedSessionId);
+      setSummaryData(data);
+      setSummaryOpen(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '生成失败');
+    }
+  };
+
+  const handleCopy = async (text: string, field: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1500);
+    } catch {
+      toast.error('复制失败');
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -270,6 +300,26 @@ export default function ChatPage() {
         </div>
       ) : (
         <div className='flex flex-1 flex-col'>
+          {/* 消息区头部：会话标题 + AI 自动内务 */}
+          <div className='flex items-center justify-between border-b px-4 py-2'>
+            <span className='truncate text-sm font-medium'>
+              {sessionData?.session?.title || `会话 #${selectedSessionId}`}
+            </span>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => void handleSummarize()}
+              disabled={summarizeMutation.isPending || sessionLoading}
+            >
+              {summarizeMutation.isPending ? (
+                <Icons.spinner className='mr-1 size-4 animate-spin' />
+              ) : (
+                <Icons.sparkles className='mr-1 size-4' />
+              )}
+              AI 自动内务
+            </Button>
+          </div>
+
           {/* 消息列表 */}
           <div className='flex-1 overflow-y-auto'>
             <div className='mx-auto max-w-3xl space-y-4 p-4'>
@@ -490,6 +540,158 @@ export default function ChatPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* AI 自动内务结果 Dialog（线 B②） */}
+      <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
+        <DialogContent className='max-h-[85vh] overflow-y-auto sm:max-w-[560px]'>
+          <DialogHeader>
+            <DialogTitle>AI 自动内务</DialogTitle>
+          </DialogHeader>
+          {summaryData && (
+            <div className='space-y-5 py-2'>
+              {/* 活动记录 */}
+              <section className='space-y-2'>
+                <div className='text-sm font-semibold'>活动记录</div>
+                <div className='grid grid-cols-[4rem_1fr] items-start gap-2 text-sm'>
+                  <span className='text-muted-foreground'>客户</span>
+                  <div className='flex items-start justify-between gap-2'>
+                    <span className='break-words'>
+                      {summaryData.customer || '—'}
+                    </span>
+                    <Button
+                      size='icon'
+                      variant='ghost'
+                      className='size-6 shrink-0'
+                      onClick={() => void handleCopy(summaryData.customer, 'customer')}
+                      disabled={!summaryData.customer}
+                    >
+                      {copiedField === 'customer' ? (
+                        <Icons.check className='size-3.5' />
+                      ) : (
+                        <Icons.copy className='size-3.5' />
+                      )}
+                    </Button>
+                  </div>
+
+                  <span className='text-muted-foreground'>摘要</span>
+                  <div className='flex items-start justify-between gap-2'>
+                    <span className='break-words'>
+                      {summaryData.summary || '—'}
+                    </span>
+                    <Button
+                      size='icon'
+                      variant='ghost'
+                      className='size-6 shrink-0'
+                      onClick={() => void handleCopy(summaryData.summary, 'summary')}
+                      disabled={!summaryData.summary}
+                    >
+                      {copiedField === 'summary' ? (
+                        <Icons.check className='size-3.5' />
+                      ) : (
+                        <Icons.copy className='size-3.5' />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className='space-y-1'>
+                  <div className='text-muted-foreground text-sm'>关键要点</div>
+                  {summaryData.keyPoints.length ? (
+                    <ul className='list-inside list-disc space-y-0.5 text-sm'>
+                      {summaryData.keyPoints.map((p, i) => (
+                        <li key={i} className='break-words'>
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className='text-sm'>—</div>
+                  )}
+                </div>
+
+                <div className='space-y-1'>
+                  <div className='text-muted-foreground text-sm'>后续行动</div>
+                  {summaryData.nextSteps.length ? (
+                    <ul className='list-inside list-disc space-y-0.5 text-sm'>
+                      {summaryData.nextSteps.map((s, i) => (
+                        <li key={i} className='break-words'>
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className='text-sm'>—</div>
+                  )}
+                </div>
+              </section>
+
+              <div className='border-t' />
+
+              {/* 跟进邮件草稿 */}
+              <section className='space-y-2'>
+                <div className='text-sm font-semibold'>跟进邮件草稿</div>
+                <div className='space-y-1'>
+                  <div className='flex items-center justify-between'>
+                    <span className='text-muted-foreground text-sm'>主题</span>
+                    <Button
+                      size='icon'
+                      variant='ghost'
+                      className='size-6 shrink-0'
+                      onClick={() =>
+                        void handleCopy(
+                          summaryData.followUpEmailSubject,
+                          'emailSubject'
+                        )
+                      }
+                      disabled={!summaryData.followUpEmailSubject}
+                    >
+                      {copiedField === 'emailSubject' ? (
+                        <Icons.check className='size-3.5' />
+                      ) : (
+                        <Icons.copy className='size-3.5' />
+                      )}
+                    </Button>
+                  </div>
+                  <div className='break-words text-sm'>
+                    {summaryData.followUpEmailSubject || '—'}
+                  </div>
+                </div>
+                <div className='space-y-1'>
+                  <div className='flex items-center justify-between'>
+                    <span className='text-muted-foreground text-sm'>正文</span>
+                    <Button
+                      size='icon'
+                      variant='ghost'
+                      className='size-6 shrink-0'
+                      onClick={() =>
+                        void handleCopy(
+                          summaryData.followUpEmailBody,
+                          'emailBody'
+                        )
+                      }
+                      disabled={!summaryData.followUpEmailBody}
+                    >
+                      {copiedField === 'emailBody' ? (
+                        <Icons.check className='size-3.5' />
+                      ) : (
+                        <Icons.copy className='size-3.5' />
+                      )}
+                    </Button>
+                  </div>
+                  <pre className='bg-muted whitespace-pre-wrap break-words rounded-md p-2 text-xs'>
+                    {summaryData.followUpEmailBody || '—'}
+                  </pre>
+                </div>
+              </section>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setSummaryOpen(false)}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
