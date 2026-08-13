@@ -33,7 +33,7 @@ import {
   useDeleteContact,
   useUpdateCustomer360
 } from '@/features/customer/api';
-import { GRADE_LABELS, STATUS_LABELS, type Contact, type Customer } from '@/features/customer/types';
+import { GRADE_LABELS, STATUS_LABELS, STAGE_LABELS, STAGE_ORDER, type Contact, type Customer } from '@/features/customer/types';
 import { toast } from 'sonner';
 
 const gradeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
@@ -135,6 +135,11 @@ function CustomerDetailContent({ id }: { id: number }) {
   const [healthInput, setHealthInput] = useState('');
   const [renewalInput, setRenewalInput] = useState('');
 
+  // 线B③ Pipeline 表单状态
+  const [stageInput, setStageInput] = useState('lead');
+  const [dealAmountInput, setDealAmountInput] = useState('');
+  const [expectedCloseInput, setExpectedCloseInput] = useState('');
+
   const c: Customer | undefined = customer;
 
   // 同步 360 编辑表单的初始值
@@ -142,8 +147,11 @@ function CustomerDetailContent({ id }: { id: number }) {
     if (c) {
       setHealthInput(c.healthScore != null ? String(c.healthScore) : '');
       setRenewalInput(c.renewalDate ?? '');
+      setStageInput(c.stage ?? 'lead');
+      setDealAmountInput(c.dealAmount != null ? String(c.dealAmount) : '');
+      setExpectedCloseInput(c.expectedCloseDate ?? '');
     }
-  }, [c?.id, c?.healthScore, c?.renewalDate]);
+  }, [c]);
 
   if (isLoading) {
     return (
@@ -217,6 +225,26 @@ function CustomerDetailContent({ id }: { id: number }) {
         renewal_date: renewalInput.trim() === '' ? null : renewalInput
       });
       toast.success('已保存客户 360 信息');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
+    }
+  };
+
+  // 线B③ Pipeline 保存：阶段 / 商机金额 / 预计成交
+  const handleSavePipeline = async () => {
+    const amtRaw = dealAmountInput.trim();
+    const amt = amtRaw === '' ? null : Number(amtRaw);
+    if (amt != null && (Number.isNaN(amt) || amt < 0)) {
+      toast.error('商机金额需为非负数');
+      return;
+    }
+    try {
+      await update360.mutateAsync({
+        stage: stageInput,
+        deal_amount: amt,
+        expected_close_date: expectedCloseInput.trim() === '' ? null : expectedCloseInput
+      });
+      toast.success('已保存商机 Pipeline 信息');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
     }
@@ -588,6 +616,59 @@ function CustomerDetailContent({ id }: { id: number }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* 线B③ Pipeline 经营仪表盘：商机阶段 / 金额 / 预计成交 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>商机 Pipeline（销售阶段）</CardTitle>
+          <CardDescription>
+            标记商机所处阶段与金额，用于经营仪表盘漏斗与加权预测（赢率权重自动计入）
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+            <div className='space-y-2'>
+              <Label>商机阶段</Label>
+              <Select value={stageInput} onValueChange={(v) => setStageInput(v as string)}>
+                <SelectTrigger className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAGE_ORDER.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {STAGE_LABELS[s] ?? s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='deal-amount'>商机金额（元）</Label>
+              <Input
+                id='deal-amount'
+                type='number'
+                min={0}
+                value={dealAmountInput}
+                onChange={(e) => setDealAmountInput(e.target.value)}
+                placeholder='如：120000'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='expected-close'>预计成交日期</Label>
+              <Input
+                id='expected-close'
+                type='date'
+                value={expectedCloseInput}
+                onChange={(e) => setExpectedCloseInput(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button onClick={handleSavePipeline} disabled={update360.isPending}>
+            {update360.isPending && <Icons.spinner className='mr-1 size-4 animate-spin' />}
+            保存商机信息
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
