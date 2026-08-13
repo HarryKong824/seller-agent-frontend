@@ -5,6 +5,7 @@ import {
   IconArrowRight,
   IconBell,
   IconBold,
+  IconBook,
   IconBox,
   IconBrandGithub,
   IconBrandTwitter,
@@ -219,6 +220,7 @@ export const Icons = {
   // Misc
   pizza: IconPizza,
   workspace: IconFolder,
+  book: IconBook,
   forms: IconClipboardText,
   slash: IconSlash,
   calendar: IconCalendar,

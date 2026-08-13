@@ -24,6 +24,14 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['k', 'k'],
         items: []
+      },
+      {
+        title: '知识沉淀',
+        url: '/dashboard/knowledge-cards',
+        icon: 'book',
+        isActive: false,
+        shortcut: ['b', 'b'],
+        items: []
       }
     ]
   },
