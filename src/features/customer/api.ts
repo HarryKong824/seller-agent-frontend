@@ -4,7 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SessionListResponse } from '../chat/types';
 
-import type { Customer, CustomerListResponse, CustomerStatsResponse } from './types';
+import type {
+  Contact,
+  ContactListResponse,
+  Customer,
+  CustomerListResponse,
+  CustomerStatsResponse
+} from './types';
 
 /** Minimal KB shape returned by GET /customers/{id}/knowledge-bases. */
 export interface RelatedKnowledgeBase {
@@ -116,5 +122,89 @@ export function useCustomerKnowledgeBases(id: number) {
       return res.json();
     },
     enabled: Number.isFinite(id) && id > 0
+  });
+}
+
+/** TanStack Query hook for a customer's DMU contacts. */
+export function useContacts(id: number) {
+  return useQuery({
+    queryKey: ['customer-contacts', id],
+    queryFn: async (): Promise<ContactListResponse> => {
+      const res = await fetch(`/api/customers/${id}/contacts`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `获取联系人失败: ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: Number.isFinite(id) && id > 0
+  });
+}
+
+/** TanStack Query mutation for creating a DMU contact. */
+export function useCreateContact(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<Contact>): Promise<Contact> => {
+      const res = await fetch(`/api/customers/${id}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `新增联系人失败: ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer-contacts', id] });
+    }
+  });
+}
+
+/** TanStack Query mutation for deleting a DMU contact. */
+export function useDeleteContact(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (contactId: number): Promise<void> => {
+      const res = await fetch(`/api/customers/${id}/contacts/${contactId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `删除联系人失败: ${res.status}`);
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer-contacts', id] });
+    }
+  });
+}
+
+/** TanStack Query mutation for patching customer 360 fields (snake_case body). */
+export function useUpdateCustomer360(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      health_score?: number | null;
+      renewal_date?: string | null;
+      status?: string;
+      last_follow_up_at?: string | null;
+    }): Promise<Customer> => {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `更新客户失败: ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer', id] });
+    }
   });
 }
