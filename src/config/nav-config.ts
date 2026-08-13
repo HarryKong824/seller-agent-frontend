@@ -50,6 +50,14 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['v', 'v'],
         items: []
+      },
+      {
+        title: 'Playbook 模板库',
+        url: '/dashboard/playbook',
+        icon: 'forms',
+        isActive: false,
+        shortcut: ['p', 'p'],
+        items: []
       }
     ]
   },
