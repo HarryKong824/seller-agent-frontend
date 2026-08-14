@@ -32,6 +32,14 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['b', 'b'],
         items: []
+      },
+      {
+        title: '每日报表',
+        url: '/dashboard/daily-reports',
+        icon: 'report',
+        isActive: false,
+        shortcut: ['r', 'r'],
+        items: []
       }
     ]
   },

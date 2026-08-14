@@ -221,6 +221,7 @@ export const Icons = {
   pizza: IconPizza,
   workspace: IconFolder,
   book: IconBook,
+  report: IconFileText,
   forms: IconClipboardText,
   slash: IconSlash,
   calendar: IconCalendar,
