@@ -87,6 +87,34 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['u', 'u'],
         items: []
+      },
+      {
+        title: '团队报表',
+        url: '/dashboard/reports',
+        icon: 'report',
+        isActive: false,
+        items: []
+      },
+      {
+        title: '管理建议',
+        url: '/dashboard/insights',
+        icon: 'sparkles',
+        isActive: false,
+        items: []
+      },
+      {
+        title: '目标管理',
+        url: '/dashboard/targets',
+        icon: 'badgeCheck',
+        isActive: false,
+        items: []
+      },
+      {
+        title: '目标完成率',
+        url: '/dashboard/targets/completion',
+        icon: 'trendingUp',
+        isActive: false,
+        items: []
       }
     ]
   },
