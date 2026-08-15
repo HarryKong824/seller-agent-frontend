@@ -140,6 +140,11 @@ function CustomerDetailContent({ id }: { id: number }) {
   const [dealAmountInput, setDealAmountInput] = useState('');
   const [expectedCloseInput, setExpectedCloseInput] = useState('');
 
+  // 线A·P3-3 地理围栏：客户坐标 + 半径
+  const [latInput, setLatInput] = useState('');
+  const [lngInput, setLngInput] = useState('');
+  const [radiusInput, setRadiusInput] = useState('');
+
   const c: Customer | undefined = customer;
 
   // 同步 360 编辑表单的初始值
@@ -150,6 +155,9 @@ function CustomerDetailContent({ id }: { id: number }) {
       setStageInput(c.stage ?? 'lead');
       setDealAmountInput(c.dealAmount != null ? String(c.dealAmount) : '');
       setExpectedCloseInput(c.expectedCloseDate ?? '');
+      setLatInput(c.locationLat != null ? String(c.locationLat) : '');
+      setLngInput(c.locationLng != null ? String(c.locationLng) : '');
+      setRadiusInput(String(c.geofenceRadius ?? 200));
     }
   }, [c]);
 
@@ -250,6 +258,51 @@ function CustomerDetailContent({ id }: { id: number }) {
     }
   };
 
+  // 线A·P3-3 地理围栏保存：客户坐标 + 半径
+  const handleSaveGeofence = async () => {
+    const lat = latInput.trim() === '' ? null : Number(latInput);
+    const lng = lngInput.trim() === '' ? null : Number(lngInput);
+    const radius = radiusInput.trim() === '' ? null : Number(radiusInput);
+    if (lat != null && (Number.isNaN(lat) || lat < -90 || lat > 90)) {
+      toast.error('纬度需在 -90 ~ 90 之间');
+      return;
+    }
+    if (lng != null && (Number.isNaN(lng) || lng < -180 || lng > 180)) {
+      toast.error('经度需在 -180 ~ 180 之间');
+      return;
+    }
+    if (radius != null && (Number.isNaN(radius) || radius < 0)) {
+      toast.error('围栏半径需为非负数');
+      return;
+    }
+    try {
+      await update360.mutateAsync({
+        location_lat: lat,
+        location_lng: lng,
+        geofence_radius: radius
+      });
+      toast.success('已保存地理围栏信息');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
+    }
+  };
+
+  const fillCurrentLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast.warning('当前环境不支持定位');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLatInput(String(pos.coords.latitude));
+        setLngInput(String(pos.coords.longitude));
+        toast.success('已填入当前定位');
+      },
+      () => toast.warning('定位被拒绝，可手动填写经纬度'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   return (
     <div className='flex flex-1 flex-col space-y-6'>
       <div className='flex items-center justify-between'>
@@ -294,6 +347,12 @@ function CustomerDetailContent({ id }: { id: number }) {
               </Badge>
             </Field>
             <Field label='负责销售'>{c.ownerSales}</Field>
+            <Field label='地理围栏半径'>{c.geofenceRadius} 米</Field>
+            <Field label='客户坐标'>
+              {c.locationLat != null && c.locationLng != null
+                ? `${c.locationLat.toFixed(6)}, ${c.locationLng.toFixed(6)}`
+                : '未设置'}
+            </Field>
           </div>
         </Card>
 
@@ -666,6 +725,62 @@ function CustomerDetailContent({ id }: { id: number }) {
           <Button onClick={handleSavePipeline} disabled={update360.isPending}>
             {update360.isPending && <Icons.spinner className='mr-1 size-4 animate-spin' />}
             保存商机信息
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* 线A·P3-3 地理围栏（拜访定位基准） */}
+      <Card>
+        <CardHeader>
+          <CardTitle>地理围栏（拜访定位基准）</CardTitle>
+          <CardDescription>
+            设置客户坐标与围栏半径，用于校验销售打卡是否在客户附近（越界仅标记，不拒绝打卡）
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+            <div className='space-y-2'>
+              <Label htmlFor='cust-lat'>客户纬度</Label>
+              <Input
+                id='cust-lat'
+                type='number'
+                step='any'
+                value={latInput}
+                onChange={(e) => setLatInput(e.target.value)}
+                placeholder='如：36.6512'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='cust-lng'>客户经度</Label>
+              <Input
+                id='cust-lng'
+                type='number'
+                step='any'
+                value={lngInput}
+                onChange={(e) => setLngInput(e.target.value)}
+                placeholder='如：117.1202'
+              />
+            </div>
+          </div>
+          <div className='flex items-end gap-2'>
+            <div className='space-y-2 grow'>
+              <Label htmlFor='cust-radius'>地理围栏半径（米）</Label>
+              <Input
+                id='cust-radius'
+                type='number'
+                min={0}
+                value={radiusInput}
+                onChange={(e) => setRadiusInput(e.target.value)}
+                placeholder='默认 200'
+              />
+            </div>
+            <Button variant='outline' type='button' onClick={fillCurrentLocation}>
+              <Icons.mapPin className='mr-1 size-4' /> 用当前位置
+            </Button>
+          </div>
+          <Button onClick={handleSaveGeofence} disabled={update360.isPending}>
+            {update360.isPending && <Icons.spinner className='mr-1 size-4 animate-spin' />}
+            保存围栏信息
           </Button>
         </CardContent>
       </Card>
