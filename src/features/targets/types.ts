@@ -1,12 +1,16 @@
-/** KPI 目标管理类型（线C·C4），镜像后端 app/schemas/targets.py */
+/** KPI 目标管理类型（线C·C4 + P3-2，DECISIONS #33/#35），镜像后端 app/schemas/targets.py */
+
+export type PeriodType = 'month' | 'quarter' | 'week';
 
 export interface TargetResponse {
   id: number;
   ownerId: number;
   ownerFullName: string | null;
   setById: number;
+  managerId: number | null;
   year: number;
-  month: number;
+  periodType: PeriodType;
+  periodIndex: number;
   visitsCountTarget: number;
   newOpportunitiesTarget: number;
   stageAdvancesTarget: number;
@@ -29,7 +33,8 @@ export interface TargetCompletionResponse {
   ownerId: number;
   ownerFullName: string;
   year: number;
-  month: number;
+  periodType: PeriodType;
+  periodIndex: number;
   periodStart: string;
   periodEnd: string;
   /** 是否设置了目标（区分未设目标与设了但为 0） */
@@ -58,7 +63,9 @@ export interface TargetCompletionResponse {
 export interface TargetCreateInput {
   owner_id: number;
   year: number;
-  month: number;
+  period_type?: PeriodType;
+  period_index: number;
+  manager_id?: number | null;
   visits_count_target?: number;
   new_opportunities_target?: number;
   stage_advances_target?: number;
@@ -85,3 +92,16 @@ export const TARGET_METRICS: { key: keyof TargetResponse; label: string; isAmoun
   { key: 'emailsSentTarget', label: '邮件发送' },
   { key: 'dealAmountTarget', label: '成交金额(元)' }
 ];
+
+/** 周期类型展示顺序与中文标签。 */
+export const PERIOD_TYPES: { value: PeriodType; label: string; max: number }[] = [
+  { value: 'month', label: '月', max: 12 },
+  { value: 'quarter', label: '季', max: 4 },
+  { value: 'week', label: '周', max: 53 }
+];
+
+export const PERIOD_TYPE_LABELS: Record<PeriodType, string> = {
+  month: '月',
+  quarter: '季',
+  week: '周'
+};

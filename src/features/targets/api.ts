@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
+  PeriodType,
   TargetCompletionResponse,
   TargetCreateInput,
   TargetResponse,
@@ -32,16 +33,20 @@ export function useUsers() {
   });
 }
 
-/** 目标列表（manager/admin 看全部，sales 看自己）。 */
+/** 目标列表（manager/admin 看全部，sales 看自己），支持周期/团队过滤。 */
 export async function fetchTargets(params: {
   ownerId?: number | null;
   year?: number | null;
-  month?: number | null;
+  periodType?: PeriodType | null;
+  periodIndex?: number | null;
+  managerId?: number | null;
 }): Promise<TargetResponse[]> {
   const qs = new URLSearchParams();
   if (params.ownerId) qs.set('owner_id', String(params.ownerId));
   if (params.year) qs.set('year', String(params.year));
-  if (params.month) qs.set('month', String(params.month));
+  if (params.periodType) qs.set('period_type', params.periodType);
+  if (params.periodIndex) qs.set('period_index', String(params.periodIndex));
+  if (params.managerId) qs.set('manager_id', String(params.managerId));
 
   const res = await fetch(`/api/targets?${qs.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
@@ -54,10 +59,19 @@ export async function fetchTargets(params: {
 export function useTargets(params: {
   ownerId?: number | null;
   year?: number | null;
-  month?: number | null;
-}) {
+  periodType?: PeriodType | null;
+  periodIndex?: number | null;
+  managerId?: number | null;
+} = {}) {
   return useQuery({
-    queryKey: ['targets', params.ownerId ?? 'all', params.year ?? 'all', params.month ?? 'all'],
+    queryKey: [
+      'targets',
+      params.ownerId ?? 'all',
+      params.year ?? 'all',
+      params.periodType ?? 'all',
+      params.periodIndex ?? 'all',
+      params.managerId ?? 'all'
+    ],
     queryFn: () => fetchTargets(params)
   });
 }
@@ -66,12 +80,14 @@ export function useTargets(params: {
 export async function fetchTargetCompletion(params: {
   ownerId: number;
   year: number;
-  month: number;
+  periodType?: PeriodType;
+  periodIndex: number;
 }): Promise<TargetCompletionResponse> {
   const qs = new URLSearchParams({
     owner_id: String(params.ownerId),
     year: String(params.year),
-    month: String(params.month)
+    period_type: params.periodType ?? 'month',
+    period_index: String(params.periodIndex)
   });
   const res = await fetch(`/api/targets/completion?${qs.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
@@ -84,10 +100,17 @@ export async function fetchTargetCompletion(params: {
 export function useTargetCompletion(params: {
   ownerId: number;
   year: number;
-  month: number;
+  periodType?: PeriodType;
+  periodIndex: number;
 }) {
   return useQuery({
-    queryKey: ['target-completion', params.ownerId, params.year, params.month],
+    queryKey: [
+      'target-completion',
+      params.ownerId,
+      params.year,
+      params.periodType ?? 'month',
+      params.periodIndex
+    ],
     queryFn: () => fetchTargetCompletion(params)
   });
 }
