@@ -20,7 +20,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { useTargetCompletion, useUsers } from '@/features/targets/api';
-import type { TargetMetricCompletion } from '@/features/targets/types';
+import { PERIOD_TYPES, type PeriodType, type TargetMetricCompletion } from '@/features/targets/types';
 
 function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`;
@@ -33,10 +33,19 @@ function metricBadge(actual: number, target: number, rate: number) {
   return 'destructive';
 }
 
+function defaultIndex(type: PeriodType): number {
+  const now = new Date();
+  if (type === 'month') return now.getMonth() + 1;
+  if (type === 'quarter') return Math.floor(now.getMonth() / 3) + 1;
+  const onejan = new Date(now.getFullYear(), 0, 1);
+  return Math.ceil((((now.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+}
+
 export default function TargetCompletionPage() {
   const now = new Date();
   const [year, setYear] = useState<number>(now.getFullYear());
-  const [month, setMonth] = useState<number>(now.getMonth() + 1);
+  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [periodIndex, setPeriodIndex] = useState<number>(defaultIndex('month'));
   const [ownerId, setOwnerId] = useState<number | null>(null);
 
   const { data: users } = useUsers();
@@ -48,7 +57,8 @@ export default function TargetCompletionPage() {
   const { data, isLoading, isError, refetch } = useTargetCompletion({
     ownerId: ownerId ?? 0,
     year,
-    month
+    periodType,
+    periodIndex
   });
 
   // ownerId 为 0 时后端要求必填；未选销售时不请求
@@ -62,7 +72,7 @@ export default function TargetCompletionPage() {
         <div>
           <h1 className='text-2xl font-semibold tracking-tight'>目标完成率</h1>
           <p className='text-muted-foreground mt-1 text-sm'>
-            按销售、年、月查看 KPI 目标完成率。拜访数取 GPS 客观打卡（与自报交叉校验），其余取量化自报。
+            按销售、年、周期（月/季/周）查看 KPI 目标完成率。拜访数取 GPS 客观打卡（与自报交叉校验），其余取量化自报。
           </p>
         </div>
       </div>
@@ -102,16 +112,34 @@ export default function TargetCompletionPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className='w-24 space-y-1'>
-          <Label>月份</Label>
-          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+        <div className='w-28 space-y-1'>
+          <Label>周期类型</Label>
+          <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <SelectItem key={m} value={String(m)}>
-                  {m} 月
+              {PERIOD_TYPES.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}度
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className='w-24 space-y-1'>
+          <Label>周期序号</Label>
+          <Select value={String(periodIndex)} onValueChange={(v) => setPeriodIndex(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from(
+                { length: PERIOD_TYPES.find((p) => p.value === periodType)?.max ?? 12 },
+                (_, i) => i + 1
+              ).map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -134,7 +162,8 @@ export default function TargetCompletionPage() {
 
       {ready && data && !data.targetSet && (
         <div className='bg-muted/50 rounded-md p-4 text-sm text-muted-foreground'>
-          该销售 {year} 年 {month} 月 <span className='font-medium'>尚未设置目标</span>，仅显示当月实际值。设置目标后可查看完成率。
+          该销售 {year} 年 {periodType === 'month' ? `${periodIndex} 月` : periodType === 'quarter' ? `Q${periodIndex}` : `第 ${periodIndex} 周`}{' '}
+          <span className='font-medium'>尚未设置目标</span>，仅显示当期实际值。设置目标后可查看完成率。
         </div>
       )}
 

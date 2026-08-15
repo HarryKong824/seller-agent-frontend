@@ -29,7 +29,9 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import {
+  PERIOD_TYPES,
   TARGET_METRICS,
+  type PeriodType,
   type TargetResponse,
   type TargetCreateInput
 } from '@/features/targets/types';
@@ -41,10 +43,32 @@ import {
   useUsers
 } from '@/features/targets/api';
 
+/** 当前日期对应的默认周期序号。 */
+function defaultIndex(type: PeriodType): number {
+  const now = new Date();
+  if (type === 'month') return now.getMonth() + 1;
+  if (type === 'quarter') return Math.floor(now.getMonth() / 3) + 1;
+  const onejan = new Date(now.getFullYear(), 0, 1);
+  return Math.ceil((((now.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+}
+
+function periodLabel(year: number, type: PeriodType, index: number): string {
+  if (type === 'month') return `${year} 年 ${index} 月`;
+  if (type === 'quarter') return `${year} Q${index}`;
+  return `${year} 第 ${index} 周`;
+}
+
+function toNonNegInt(v: string): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
 type FormState = {
   ownerId: number | null;
+  managerId: number | null;
   year: number;
-  month: number;
+  periodType: PeriodType;
+  periodIndex: number;
   visitsCountTarget: string;
   newOpportunitiesTarget: string;
   stageAdvancesTarget: string;
@@ -55,8 +79,10 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   ownerId: null,
+  managerId: null,
   year: new Date().getFullYear(),
-  month: new Date().getMonth() + 1,
+  periodType: 'month',
+  periodIndex: defaultIndex('month'),
   visitsCountTarget: '0',
   newOpportunitiesTarget: '0',
   stageAdvancesTarget: '0',
@@ -65,19 +91,35 @@ const EMPTY_FORM: FormState = {
   dealAmountTarget: '0'
 };
 
-function toNonNegInt(v: string): number {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-}
-
 export default function TargetsPage() {
   const { data: users } = useUsers();
   const salesOptions = useMemo(
     () => (users ?? []).filter((u) => u.role === 'sales' || u.role === 'manager'),
     [users]
   );
+  const managerOptions = useMemo(
+    () => (users ?? []).filter((u) => u.role === 'manager'),
+    [users]
+  );
+  const userMap = useMemo(() => {
+    const m = new Map<number, string>();
+    (users ?? []).forEach((u) => m.set(u.id, u.full_name || u.username));
+    return m;
+  }, [users]);
 
-  const { data, isLoading, isError } = useTargets({});
+  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [periodIndex, setPeriodIndex] = useState<number>(defaultIndex('month'));
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [ownerId, setOwnerId] = useState<number | null>(null);
+  const [managerId, setManagerId] = useState<number | null>(null);
+
+  const { data, isLoading, isError } = useTargets({
+    ownerId,
+    year,
+    periodType,
+    periodIndex,
+    managerId
+  });
   const createMut = useCreateTarget();
   const updateMut = useUpdateTarget();
   const deleteMut = useDeleteTarget();
@@ -89,9 +131,15 @@ export default function TargetsPage() {
 
   const targets = useMemo(() => data ?? [], [data]);
 
+  // 周期类型切换时重置周期序号默认值
+  function changePeriodType(t: PeriodType) {
+    setPeriodType(t);
+    setPeriodIndex(defaultIndex(t));
+  }
+
   function openCreate() {
     setEditTarget(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, year, periodType, periodIndex: defaultIndex(periodType) });
     setFormOpen(true);
   }
 
@@ -99,8 +147,10 @@ export default function TargetsPage() {
     setEditTarget(t);
     setForm({
       ownerId: t.ownerId,
+      managerId: t.managerId,
       year: t.year,
-      month: t.month,
+      periodType: t.periodType,
+      periodIndex: t.periodIndex,
       visitsCountTarget: String(t.visitsCountTarget),
       newOpportunitiesTarget: String(t.newOpportunitiesTarget),
       stageAdvancesTarget: String(t.stageAdvancesTarget),
@@ -115,7 +165,9 @@ export default function TargetsPage() {
     return {
       owner_id: form.ownerId as number,
       year: form.year,
-      month: form.month,
+      period_type: form.periodType,
+      period_index: form.periodIndex,
+      manager_id: form.managerId,
       visits_count_target: toNonNegInt(form.visitsCountTarget),
       new_opportunities_target: toNonNegInt(form.newOpportunitiesTarget),
       stage_advances_target: toNonNegInt(form.stageAdvancesTarget),
@@ -128,6 +180,11 @@ export default function TargetsPage() {
   async function handleSubmit() {
     if (!form.ownerId) {
       toast.error('请选择目标归属销售');
+      return;
+    }
+    const idxMax = PERIOD_TYPES.find((p) => p.value === form.periodType)?.max ?? 12;
+    if (form.periodIndex < 1 || form.periodIndex > idxMax) {
+      toast.error(`周期序号超出 ${form.periodType} 合法范围 1-${idxMax}`);
       return;
     }
     try {
@@ -169,7 +226,7 @@ export default function TargetsPage() {
         <div>
           <h1 className='text-2xl font-semibold tracking-tight'>目标管理</h1>
           <p className='text-muted-foreground mt-1 text-sm'>
-            为销售设置月度量化 KPI 目标（拜访/商机/阶段/通话/邮件/金额）。完成率以 GPS 客观打卡等实际值对比目标计算。
+            为销售设置周期量化 KPI 目标（月/季/周）。完成率以 GPS 客观打卡等实际值对比目标计算。
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -178,11 +235,101 @@ export default function TargetsPage() {
         </Button>
       </div>
 
+      {/* 筛选 */}
+      <div className='flex flex-wrap gap-3'>
+        <div className='w-40 space-y-1'>
+          <Label className='text-xs'>周期类型</Label>
+          <Select value={periodType} onValueChange={(v) => changePeriodType(v as PeriodType)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_TYPES.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}度
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className='w-24 space-y-1'>
+          <Label className='text-xs'>周期序号</Label>
+          <Select value={String(periodIndex)} onValueChange={(v) => setPeriodIndex(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from(
+                { length: PERIOD_TYPES.find((p) => p.value === periodType)?.max ?? 12 },
+                (_, i) => i + 1
+              ).map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className='w-28 space-y-1'>
+          <Label className='text-xs'>年份</Label>
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[year - 1, year, year + 1].map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className='w-40 space-y-1'>
+          <Label className='text-xs'>归属销售</Label>
+          <Select
+            value={ownerId ? String(ownerId) : 'all'}
+            onValueChange={(v) => setOwnerId(v === 'all' ? null : Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>全部销售</SelectItem>
+              {salesOptions.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.full_name || u.username}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className='w-40 space-y-1'>
+          <Label className='text-xs'>团队经理</Label>
+          <Select
+            value={managerId ? String(managerId) : 'all'}
+            onValueChange={(v) => setManagerId(v === 'all' ? null : Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>全部团队</SelectItem>
+              {managerOptions.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.full_name || u.username}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {isLoading && <p className='text-muted-foreground text-sm'>加载中…</p>}
       {isError && <p className='text-sm text-red-500'>加载目标失败，请确认你有管理者权限后重试。</p>}
 
       {!isLoading && !isError && targets.length === 0 && (
-        <p className='text-muted-foreground text-sm'>暂无目标，点击右上角「设置目标」。</p>
+        <p className='text-muted-foreground text-sm'>该周期暂无目标，点击右上角「设置目标」。</p>
       )}
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
@@ -191,7 +338,12 @@ export default function TargetsPage() {
             <CardHeader className='flex flex-row items-start justify-between space-y-0'>
               <div className='flex flex-col gap-1'>
                 <CardTitle className='text-base'>{t.ownerFullName || `用户#${t.ownerId}`}</CardTitle>
-                <Badge variant='secondary'>{t.year} 年 {t.month} 月</Badge>
+                <Badge variant='secondary'>{periodLabel(t.year, t.periodType, t.periodIndex)}</Badge>
+                {t.managerId != null && (
+                  <Badge variant='outline' className='w-fit'>
+                    团队：{userMap.get(t.managerId) || `#${t.managerId}`}
+                  </Badge>
+                )}
               </div>
               <div className='flex gap-1'>
                 <Button variant='ghost' size='icon' className='size-7' onClick={() => openEdit(t)} aria-label='编辑'>
@@ -259,7 +411,7 @@ export default function TargetsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className='w-24 space-y-2'>
+              <div className='w-28 space-y-2'>
                 <Label>年份</Label>
                 <Select value={String(form.year)} onValueChange={(v) => setForm({ ...form, year: Number(v) })} disabled={!!editTarget}>
                   <SelectTrigger>
@@ -274,16 +426,65 @@ export default function TargetsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className='w-20 space-y-2'>
-                <Label>月份</Label>
-                <Select value={String(form.month)} onValueChange={(v) => setForm({ ...form, month: Number(v) })} disabled={!!editTarget}>
+            </div>
+            <div className='flex gap-3'>
+              <div className='w-32 space-y-2'>
+                <Label>周期类型</Label>
+                <Select
+                  value={form.periodType}
+                  onValueChange={(v) =>
+                    setForm({ ...form, periodType: v as PeriodType, periodIndex: defaultIndex(v as PeriodType) })
+                  }
+                  disabled={!!editTarget}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <SelectItem key={m} value={String(m)}>
-                        {m}
+                    {PERIOD_TYPES.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}度
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='w-28 space-y-2'>
+                <Label>周期序号</Label>
+                <Select
+                  value={String(form.periodIndex)}
+                  onValueChange={(v) => setForm({ ...form, periodIndex: Number(v) })}
+                  disabled={!!editTarget}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      { length: PERIOD_TYPES.find((p) => p.value === form.periodType)?.max ?? 12 },
+                      (_, i) => i + 1
+                    ).map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='flex-1 space-y-2'>
+                <Label>团队经理（可选）</Label>
+                <Select
+                  value={form.managerId ? String(form.managerId) : 'none'}
+                  onValueChange={(v) => setForm({ ...form, managerId: v === 'none' ? null : Number(v) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='不指定' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='none'>不指定（默认归属设定者）</SelectItem>
+                    {managerOptions.map((u) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.full_name || u.username}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -305,7 +506,7 @@ export default function TargetsPage() {
               ))}
             </div>
             {!editTarget && (
-              <p className='text-muted-foreground text-xs'>同一销售同年同月仅能设置一条目标，重复将提示已存在。</p>
+              <p className='text-muted-foreground text-xs'>同一销售同周期仅能设置一条目标，重复将提示已存在。</p>
             )}
           </div>
           <DialogFooter>
@@ -335,7 +536,7 @@ export default function TargetsPage() {
             <DialogTitle>确认删除</DialogTitle>
           </DialogHeader>
           <p className='text-muted-foreground py-2 text-sm'>
-            确定删除 {deleteTarget?.ownerFullName} {deleteTarget?.year} 年 {deleteTarget?.month} 月的目标？此操作不可撤销。
+            确定删除 {deleteTarget?.ownerFullName} {periodLabel(deleteTarget?.year ?? 0, deleteTarget?.periodType ?? 'month', deleteTarget?.periodIndex ?? 0)} 的目标？此操作不可撤销。
           </p>
           <DialogFooter>
             <Button variant='outline' onClick={() => setDeleteTarget(null)}>
