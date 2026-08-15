@@ -13,6 +13,9 @@ export interface VisitCheckin {
   location_lng: number;
   location_accuracy: number | null;
   address: string | null;
+  /** 线A·P3-3 地理围栏：打卡点到客户直线距离(米) + 是否在围栏内 */
+  geofenceDistanceM: number | null;
+  geofenceValid: boolean;
   note: string | null;
   created_at: string;
 }

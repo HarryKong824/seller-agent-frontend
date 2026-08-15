@@ -298,7 +298,8 @@ export default function VisitsPage() {
                     <TableHead>拜访对象</TableHead>
                     <TableHead>动作</TableHead>
                     <TableHead>关联客户</TableHead>
-                    <TableHead>位置</TableHead>
+                    <TableHead>位置 / 地址</TableHead>
+                    <TableHead>围栏</TableHead>
                     <TableHead>备注</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -325,7 +326,26 @@ export default function VisitsPage() {
                         )}
                       </TableCell>
                       <TableCell className='text-muted-foreground whitespace-nowrap text-xs'>
-                        {v.location_lat.toFixed(4)}, {v.location_lng.toFixed(4)}
+                        <div>{v.location_lat.toFixed(4)}, {v.location_lng.toFixed(4)}</div>
+                        {v.address && (
+                          <div className='text-muted-foreground/80 mt-0.5 max-w-[220px] truncate' title={v.address}>
+                            {v.address}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {v.geofenceValid ? (
+                          <Badge variant='secondary' className='text-green-600'>
+                            在围栏内
+                          </Badge>
+                        ) : (
+                          <Badge variant='destructive'>
+                            ⚠️ 越界
+                            {v.geofenceDistanceM != null
+                              ? ` ${Math.round(v.geofenceDistanceM)}m`
+                              : ''}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell
                         className='text-muted-foreground max-w-[200px] truncate'
