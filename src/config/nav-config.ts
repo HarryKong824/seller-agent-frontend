@@ -74,6 +74,14 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['p', 'p'],
         items: []
+      },
+      {
+        title: '线索管理',
+        url: '/dashboard/leads',
+        icon: 'user2',
+        isActive: false,
+        shortcut: ['l', 'l'],
+        items: []
       }
     ]
   },
