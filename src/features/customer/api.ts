@@ -194,6 +194,9 @@ export function useUpdateCustomer360(id: number) {
     stage?: string | null;
     deal_amount?: number | null;
     expected_close_date?: string | null;
+    location_lat?: number | null;
+    location_lng?: number | null;
+    geofence_radius?: number | null;
   }): Promise<Customer> => {
     const res = await fetch(`/api/customers/${id}`, {
       method: 'PATCH',

@@ -18,6 +18,10 @@ export interface Customer {
   dealAmount: number | null;
   /** 线B③ Pipeline：预计成交日期 ISO(yyyy-MM-dd)，null=未设置 */
   expectedCloseDate: string | null;
+  /** 线A·P3-3 地理围栏：客户坐标（可空）+ 围栏半径(米) */
+  locationLat: number | null;
+  locationLng: number | null;
+  geofenceRadius: number;
   created_at: string;
   updated_at: string;
 }
