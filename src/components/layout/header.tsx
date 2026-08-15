@@ -5,6 +5,7 @@ import { Breadcrumbs } from '../breadcrumbs';
 import SearchInput from '../search-input';
 import { ThemeSelector } from '../themes/theme-selector';
 import { ThemeModeToggle } from '../themes/theme-mode-toggle';
+import NotificationBell from './notification-bell';
 
 export default function Header() {
   return (
@@ -19,6 +20,7 @@ export default function Header() {
         <div className='hidden md:flex'>
           <SearchInput />
         </div>
+        <NotificationBell />
         <ThemeModeToggle />
         <div className='hidden sm:block'>
           <ThemeSelector />
