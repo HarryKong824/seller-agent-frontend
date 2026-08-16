@@ -16,6 +16,8 @@ export interface VisitCheckin {
   /** 线A·P3-3 地理围栏：打卡点到客户直线距离(米) + 是否在围栏内 */
   geofenceDistanceM: number | null;
   geofenceValid: boolean;
+  /** 线A·P3-3 补卡：定位精度>100m，标"补卡"待审，不计自动统计 */
+  isSupplemental: boolean;
   note: string | null;
   created_at: string;
 }

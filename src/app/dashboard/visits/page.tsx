@@ -334,7 +334,12 @@ export default function VisitsPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {v.geofenceValid ? (
+                        {v.isSupplemental ? (
+                          <Badge variant='outline' className='text-amber-600'>
+                            <Icons.warning className='mr-1 size-3' />
+                            补卡待审
+                          </Badge>
+                        ) : v.geofenceValid ? (
                           <Badge variant='secondary' className='text-green-600'>
                             在围栏内
                           </Badge>

@@ -22,15 +22,34 @@ import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { useAuth } from '@/hooks/use-auth';
-import { METRIC_ORDER, MODE_LABELS, type DailyReport } from '@/features/daily-reports/types';
+import { useCustomers } from '@/features/customer/api';
+import {
+  METRIC_ORDER,
+  MODE_LABELS,
+  type DailyReport,
+  type ManagerJudgment
+} from '@/features/daily-reports/types';
 import {
   useCreateReport,
   useDeleteReport,
   useDailyReports,
   useGenerateReport,
+  useSetVisitJudgment,
   useUpdateReport
 } from '@/features/daily-reports/api';
+
+type VisitRow = {
+  customer_id: number | null;
+  visit_action_note: string;
+};
 
 type FormState = {
   report_date: string;
@@ -40,6 +59,7 @@ type FormState = {
   emails_sent: string;
   deal_amount: string;
   summary: string;
+  visits: VisitRow[];
 };
 
 const EMPTY_FORM: FormState = {
@@ -49,7 +69,8 @@ const EMPTY_FORM: FormState = {
   call_minutes: '0',
   emails_sent: '0',
   deal_amount: '0',
-  summary: ''
+  summary: '',
+  visits: [{ customer_id: null, visit_action_note: '' }]
 };
 
 function todayISO(): string {
@@ -61,12 +82,54 @@ function toNonNegInt(v: string): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
 
+function JudgmentBadge({ judgment }: { judgment: ManagerJudgment }) {
+  if (judgment === 'normal') {
+    return (
+      <Badge variant='secondary' className='text-green-600'>
+        <Icons.circleCheck className='mr-1 size-3' />
+        有效(正常)
+      </Badge>
+    );
+  }
+  if (judgment === 'abnormal') {
+    return (
+      <Badge variant='destructive'>
+        <Icons.circleX className='mr-1 size-3' />
+        不达成
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant='outline'>
+      <Icons.warning className='mr-1 size-3' />
+      待复核
+    </Badge>
+  );
+}
+
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score == null) {
+    return <Badge variant='outline'>未评分</Badge>;
+  }
+  const cls =
+    score >= 60 ? 'text-green-600' : score >= 30 ? 'text-amber-600' : 'text-red-600';
+  return (
+    <Badge variant='secondary' className={cls}>
+      加权 {score}
+    </Badge>
+  );
+}
+
 export default function DailyReportsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isManager = user?.role === 'manager' || isAdmin;
+  const canReview = isManager;
 
   const [dateFilter, setDateFilter] = useState('');
   const { data, isLoading, isError } = useDailyReports(dateFilter || undefined);
+  const { data: customersData } = useCustomers(1, 100);
+  const customers = customersData?.items ?? [];
 
   const [formOpen, setFormOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -77,13 +140,37 @@ export default function DailyReportsPage() {
   });
   const [editTarget, setEditTarget] = useState<DailyReport | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DailyReport | null>(null);
+  const [detailTarget, setDetailTarget] = useState<DailyReport | null>(null);
+  const [draftJudgment, setDraftJudgment] = useState<Record<number, ManagerJudgment>>({});
 
   const createMut = useCreateReport();
   const generateMut = useGenerateReport();
   const updateMut = useUpdateReport();
   const deleteMut = useDeleteReport();
+  const judgeMut = useSetVisitJudgment();
 
   const items = useMemo(() => data ?? [], [data]);
+
+  function addVisitRow() {
+    setForm((f) => ({
+      ...f,
+      visits: [...f.visits, { customer_id: null, visit_action_note: '' }]
+    }));
+  }
+
+  function removeVisitRow(i: number) {
+    setForm((f) => ({ ...f, visits: f.visits.filter((_, idx) => idx !== i) }));
+  }
+
+  function updateVisitRow(
+    i: number,
+    patch: Partial<{ customer_id: number | null; visit_action_note: string }>
+  ) {
+    setForm((f) => ({
+      ...f,
+      visits: f.visits.map((row, idx) => (idx === i ? { ...row, ...patch } : row))
+    }));
+  }
 
   function openForm() {
     setForm(EMPTY_FORM);
@@ -99,9 +186,26 @@ export default function DailyReportsPage() {
       call_minutes: String(r.callMinutes),
       emails_sent: String(r.emailsSent),
       deal_amount: String(r.dealAmount),
-      summary: r.summary ?? ''
+      summary: r.summary ?? '',
+      visits: (r.visits ?? []).map((v) => ({
+        customer_id: v.customerId,
+        visit_action_note: v.visitActionNote ?? ''
+      }))
     });
     setFormOpen(true);
+  }
+
+  function openDetail(r: DailyReport) {
+    setDetailTarget(r);
+  }
+
+  function buildVisitsPayload() {
+    return form.visits
+      .filter((v) => v.customer_id != null && v.visit_action_note.trim().length > 0)
+      .map((v) => ({
+        customer_id: v.customer_id as number,
+        visit_action_note: v.visit_action_note.trim()
+      }));
   }
 
   async function handleCreate() {
@@ -117,7 +221,8 @@ export default function DailyReportsPage() {
         call_minutes: toNonNegInt(form.call_minutes),
         emails_sent: toNonNegInt(form.emails_sent),
         deal_amount: Number(form.deal_amount) || 0,
-        summary: form.summary.trim() || null
+        summary: form.summary.trim() || null,
+        visits: buildVisitsPayload()
       });
       toast.success('日报已提交');
       setFormOpen(false);
@@ -150,7 +255,8 @@ export default function DailyReportsPage() {
         call_minutes: toNonNegInt(form.call_minutes),
         emails_sent: toNonNegInt(form.emails_sent),
         deal_amount: Number(form.deal_amount) || 0,
-        summary: form.summary.trim() || null
+        summary: form.summary.trim() || null,
+        visits: buildVisitsPayload()
       });
       toast.success('已更新日报');
       setEditTarget(null);
@@ -168,6 +274,18 @@ export default function DailyReportsPage() {
       setDeleteTarget(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '删除失败');
+    }
+  }
+
+  async function handleJudge(visitId: number) {
+    try {
+      await judgeMut.mutateAsync({
+        visitId,
+        judgment: draftJudgment[visitId] ?? 'normal'
+      });
+      toast.success('人审结论已保存');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '人审失败');
     }
   }
 
@@ -222,9 +340,25 @@ export default function DailyReportsPage() {
             <CardHeader className='flex flex-row items-start justify-between gap-2 space-y-0'>
               <div className='flex flex-col gap-1'>
                 <CardTitle className='text-base'>{r.reportDate}</CardTitle>
-                <Badge variant='secondary'>{MODE_LABELS[r.mode]}</Badge>
+                <div className='flex flex-wrap gap-1'>
+                  <Badge variant='secondary'>{MODE_LABELS[r.mode]}</Badge>
+                  {(r.effectiveVisitsCount ?? 0) > 0 && (
+                    <Badge variant='secondary' className='text-green-600'>
+                      有效拜访 {r.effectiveVisitsCount}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className='flex gap-1'>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='size-7'
+                  onClick={() => openDetail(r)}
+                  aria-label='明细/人审'
+                >
+                  <Icons.forms className='size-4' />
+                </Button>
                 <Button
                   variant='ghost'
                   size='icon'
@@ -357,6 +491,73 @@ export default function DailyReportsPage() {
                 placeholder='当日重点工作与下一步'
               />
             </div>
+
+            {/* F14：逐客户拜访动作明细 */}
+            <div className='space-y-3 rounded-md border p-3'>
+              <div className='flex items-center justify-between'>
+                <Label className='text-sm font-semibold'>拜访动作明细 (F14)</Label>
+                <Button type='button' variant='outline' size='sm' onClick={addVisitRow}>
+                  <Icons.plusCircle className='mr-1 size-4' />
+                  添加明细
+                </Button>
+              </div>
+              {form.visits.map((row, i) => (
+                <div key={i} className='space-y-2 rounded-md border p-3'>
+                  <div className='flex items-end gap-2'>
+                    <div className='flex-1 space-y-2'>
+                      <Label>关联客户</Label>
+                      <Select
+                        value={row.customer_id != null ? String(row.customer_id) : 'none'}
+                        onValueChange={(v) =>
+                          updateVisitRow(i, {
+                            customer_id: v === 'none' ? null : Number(v)
+                          })
+                        }
+                      >
+                        <SelectTrigger className='w-full'>
+                          <SelectValue placeholder='选择客户' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='none'>不关联具体客户</SelectItem>
+                          {customers.map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {form.visits.length > 1 && (
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='icon'
+                        className='size-8 text-red-500'
+                        onClick={() => removeVisitRow(i)}
+                        aria-label='删除明细'
+                      >
+                        <Icons.trash className='size-4' />
+                      </Button>
+                    )}
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>拜访动作说明（必填）</Label>
+                    <Textarea
+                      rows={2}
+                      value={row.visit_action_note}
+                      onChange={(e) =>
+                        updateVisitRow(i, { visit_action_note: e.target.value })
+                      }
+                      placeholder='说明本次拜访做了什么（如：演示方案、确认需求、推进商务）'
+                    />
+                  </div>
+                </div>
+              ))}
+              <p className='text-muted-foreground text-xs'>
+                逐客户填写拜访动作；管理者将据此人审"是否有效拜访"。未填动作说明的明细不会提交。
+              </p>
+            </div>
+
             <p className='text-muted-foreground text-xs'>
               拜访数(打卡)由系统按 GPS 打卡自动统计，无需填写。
             </p>
@@ -381,6 +582,73 @@ export default function DailyReportsPage() {
               {editTarget ? '保存' : '提交'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 明细 / 人审 Dialog */}
+      <Dialog open={detailTarget !== null} onOpenChange={(o) => !o && setDetailTarget(null)}>
+        <DialogContent className='sm:max-w-[640px]'>
+          <DialogHeader>
+            <DialogTitle>日报明细 · 管理者人审</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-3 py-2'>
+            {detailTarget && (detailTarget.visits ?? []).length === 0 && (
+              <p className='text-muted-foreground text-sm'>该日报暂无拜访动作明细。</p>
+            )}
+            {detailTarget?.visits.map((v) => (
+              <div key={v.id} className='space-y-2 rounded-md border p-3'>
+                <div className='flex items-center justify-between gap-2'>
+                  <span className='font-medium'>
+                    {v.customerName ?? `#${v.customerId}`}
+                  </span>
+                  <ScoreBadge score={v.visitScore} />
+                </div>
+                <p className='text-muted-foreground whitespace-pre-wrap text-sm'>
+                  {v.visitActionNote ?? '—'}
+                </p>
+                <div className='flex items-center gap-2'>
+                  <JudgmentBadge judgment={v.managerJudgment} />
+                  {canReview && (
+                    <div className='ml-auto flex items-center gap-2'>
+                      <Select
+                        value={draftJudgment[v.id] ?? v.managerJudgment}
+                        onValueChange={(val) =>
+                          setDraftJudgment((d) => ({
+                            ...d,
+                            [v.id]: val as ManagerJudgment
+                          }))
+                        }
+                      >
+                        <SelectTrigger className='w-28'>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='normal'>正常</SelectItem>
+                          <SelectItem value='pending'>待复核</SelectItem>
+                          <SelectItem value='abnormal'>不达成</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size='sm'
+                        disabled={judgeMut.isPending}
+                        onClick={() => handleJudge(v.id)}
+                      >
+                        {judgeMut.isPending && (
+                          <Icons.spinner className='mr-1 size-4 animate-spin' />
+                        )}
+                        保存
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {canReview && (detailTarget?.visits.length ?? 0) > 0 && (
+              <p className='text-muted-foreground text-xs'>
+                人审结论"正常"计入有效拜访（KPI 真值），"不达成"排除。系统不自动裁决，以管理者判断为准。
+              </p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
