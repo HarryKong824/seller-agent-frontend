@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { DailyReport } from './types';
+import type { DailyReport, DailyReportVisitInput, ManagerJudgment } from './types';
 
 /** GET /api/daily-reports/me — list current user's reports (optional date filter). */
 async function fetchMyReports(date?: string): Promise<DailyReport[]> {
@@ -30,6 +30,8 @@ export type DailyReportInput = {
   emails_sent?: number;
   deal_amount?: number;
   summary?: string | null;
+  /** F14：逐客户拜访动作明细（按客户 upsert）。 */
+  visits?: DailyReportVisitInput[];
 };
 
 async function createReport(payload: DailyReportInput): Promise<DailyReport> {
@@ -127,6 +129,41 @@ export function useDeleteReport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteReport,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['daily-reports'] });
+    }
+  });
+}
+
+/** 管理者人审：定夺某条拜访明细是否有效（F14 决策 #4/#5）。 */
+async function setVisitJudgment(
+  visitId: number,
+  judgment: ManagerJudgment,
+  score?: number | null
+): Promise<void> {
+  const res = await fetch(`/api/daily-reports/visits/${visitId}/judgment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ judgment, score: score ?? null })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `人审失败: ${res.status}`);
+  }
+}
+
+export function useSetVisitJudgment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      visitId,
+      judgment,
+      score
+    }: {
+      visitId: number;
+      judgment: ManagerJudgment;
+      score?: number | null;
+    }) => setVisitJudgment(visitId, judgment, score),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['daily-reports'] });
     }
