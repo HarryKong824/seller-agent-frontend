@@ -60,16 +60,34 @@ const roleVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
 };
 
 function roleLabel(role: string): string {
-  return { sales: '销售', manager: '经理', admin: '管理员' }[role] ?? role;
+  return { sales: '销售人员', manager: '主管', admin: '管理员' }[role] ?? role;
 }
+
+/** 权限说明，方便不懂技术的管理员理解每个角色的职能 */
+const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  sales: '管理客户、拜访打卡、使用 AI 对话、提交日报',
+  manager: '管理团队成员、查看团队报表、设定目标、查看管理建议',
+  admin: '全部权限：用户管理、系统配置、所有业务功能'
+};
 
 function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('sales');
   const [submitting, setSubmitting] = useState(false);
+
+  const resetForm = () => {
+    setUsername('');
+    setPassword('');
+    setConfirmPassword('');
+    setFullName('');
+    setEmail('');
+    setRole('sales');
+  };
 
   const handleSubmit = async () => {
     if (username.trim().length < 3) {
@@ -78,6 +96,10 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
     }
     if (password.length < 6) {
       toast.error('密码至少 6 个字符');
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error('两次输入的密码不一致');
       return;
     }
     if (!fullName.trim()) {
@@ -93,7 +115,8 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
           username: username.trim(),
           password,
           full_name: fullName.trim(),
-          role
+          role,
+          ...(email.trim() ? { email: email.trim() } : {})
         })
       });
       if (!res.ok) {
@@ -102,10 +125,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
       }
       toast.success('用户创建成功');
       setOpen(false);
-      setUsername('');
-      setPassword('');
-      setFullName('');
-      setRole('sales');
+      resetForm();
       onCreated();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
@@ -124,10 +144,10 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
           </Button>
         }
       />
-      <DialogContent className='sm:max-w-[425px]'>
+      <DialogContent className='sm:max-w-[480px]'>
         <DialogHeader>
           <DialogTitle>新建用户</DialogTitle>
-          <DialogDescription>由管理员创建账号并分配角色</DialogDescription>
+          <DialogDescription>由管理员创建账号并分配角色，注册后用户可凭账号密码登录</DialogDescription>
         </DialogHeader>
         <div className='space-y-4 py-4'>
           <div className='space-y-2'>
@@ -136,7 +156,26 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
               id='u-username'
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder='至少 3 个字符'
+              placeholder='登录用用户名，至少 3 个字符'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='u-fullname'>姓名</Label>
+            <Input
+              id='u-fullname'
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder='真实姓名，用于显示'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='u-email'>邮箱（选填）</Label>
+            <Input
+              id='u-email'
+              type='email'
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder='选填，用于接收通知'
             />
           </div>
           <div className='space-y-2'>
@@ -150,28 +189,37 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
             />
           </div>
           <div className='space-y-2'>
-            <Label htmlFor='u-fullname'>姓名</Label>
+            <Label htmlFor='u-confirm-password'>确认密码</Label>
             <Input
-              id='u-fullname'
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder='真实姓名'
+              id='u-confirm-password'
+              type='password'
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder='再输入一次密码'
             />
           </div>
           <div className='space-y-2'>
-            <Label>角色</Label>
+            <Label>角色权限</Label>
             <Select value={role} onValueChange={(v) => setRole(v as Role)}>
               <SelectTrigger className='w-full'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ROLE_OPTIONS.map((r) => (
+                {ROLE_OPTIONS.map((r, i) => (
                   <SelectItem key={r} value={r}>
-                    {roleLabel(r)}
+                    <span className='flex flex-col'>
+                      <span>{`${i + 1}. ${roleLabel(r)}`}</span>
+                      <span className='text-muted-foreground text-xs'>
+                        {ROLE_DESCRIPTIONS[r]}
+                      </span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className='text-muted-foreground text-xs'>
+              {ROLE_DESCRIPTIONS[role]}
+            </p>
           </div>
         </div>
         <DialogFooter>
@@ -180,7 +228,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
             {submitting ? <Icons.spinner className='mr-1 size-4 animate-spin' /> : null}
-            创建
+            创建用户
           </Button>
         </DialogFooter>
       </DialogContent>
