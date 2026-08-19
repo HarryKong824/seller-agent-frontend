@@ -1,40 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { registerWithBackend } from '@/lib/auth';
+import { NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { username, password, full_name } = body;
-
-    if (!username || !password || !full_name) {
-      return NextResponse.json(
-        { error: '用户名、姓名和密码均不能为空' },
-        { status: 400 }
-      );
-    }
-
-    if (String(username).length < 3) {
-      return NextResponse.json(
-        { error: '用户名至少 3 个字符' },
-        { status: 400 }
-      );
-    }
-
-    if (String(password).length < 6) {
-      return NextResponse.json(
-        { error: '密码至少 6 个字符' },
-        { status: 400 }
-      );
-    }
-
-    await registerWithBackend(username, password, full_name);
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    const e = err as Error & { status?: number };
-    return NextResponse.json(
-      { error: e.message || '注册失败' },
-      { status: e.status || 400 }
-    );
-  }
+/**
+ * 公开注册已关闭——账户由管理员统一开通。
+ * 用户管理页面：/dashboard/users（仅管理员可访问）。
+ *
+ * 保留此路由是为了给出明确的 403 响应，而非 404，
+ * 避免调用方误以为是路径错误。
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: '注册已关闭。请联系管理员开通账户。',
+      hint: '管理员可在「用户管理」页面创建账户并分配角色。'
+    },
+    { status: 403 }
+  );
 }

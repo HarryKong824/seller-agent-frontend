@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Icons } from '@/components/icons';
-import Link from 'next/link';
 
 export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard/overview';
-  const registered = searchParams.get('registered') === '1';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -83,12 +81,6 @@ export default function SignInPage() {
 
           {error && <p className='text-sm text-destructive'>{error}</p>}
 
-          {registered && (
-            <p className='rounded-md bg-primary/10 px-3 py-2 text-sm text-primary'>
-              注册成功，请使用新账户登录。
-            </p>
-          )}
-
           <Button type='submit' className='w-full' disabled={loading}>
             {loading && <Icons.spinner className='mr-2 h-4 w-4 animate-spin' />}
             登录
@@ -96,17 +88,7 @@ export default function SignInPage() {
         </form>
 
         <div className='text-center text-sm text-muted-foreground'>
-          <span>还没有账户？</span>{' '}
-          <Link href='/auth/sign-up' className='text-primary hover:underline'>
-            立即注册
-          </Link>
-        </div>
-
-        <div className='text-center text-sm text-muted-foreground'>
-          <span>忘记密码？</span>{' '}
-          <button type='button' className='text-primary hover:underline'>
-            联系管理员
-          </button>
+          没有账户？请联系管理员开通
         </div>
       </div>
     </div>
