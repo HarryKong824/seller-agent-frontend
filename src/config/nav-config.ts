@@ -102,35 +102,40 @@ export const navGroups: NavGroup[] = [
         icon: 'user',
         isActive: false,
         shortcut: ['u', 'u'],
-        items: []
+        items: [],
+        access: { role: 'admin' }
       },
       {
         title: '团队报表',
         url: '/dashboard/reports',
         icon: 'report',
         isActive: false,
-        items: []
+        items: [],
+        access: { role: 'manager' }
       },
       {
         title: '管理建议',
         url: '/dashboard/insights',
         icon: 'sparkles',
         isActive: false,
-        items: []
+        items: [],
+        access: { role: 'manager' }
       },
       {
         title: '目标管理',
         url: '/dashboard/targets',
         icon: 'badgeCheck',
         isActive: false,
-        items: []
+        items: [],
+        access: { role: 'manager' }
       },
       {
         title: '目标完成率',
         url: '/dashboard/targets/completion',
         icon: 'trendingUp',
         isActive: false,
-        items: []
+        items: [],
+        access: { role: 'manager' }
       }
     ]
   },

@@ -37,8 +37,8 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { isOpen } = useMediaQuery();
   const router = useRouter();
-  const filteredGroups = useFilteredNavGroups(navGroups);
   const { user } = useAuth();
+  const filteredGroups = useFilteredNavGroups(navGroups, user?.role);
 
   const displayName = user?.username ?? 'Guest';
   const displayEmail = user?.email ?? 'Not signed in';
