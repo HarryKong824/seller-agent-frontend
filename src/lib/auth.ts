@@ -80,3 +80,30 @@ export async function authenticateWithBackend(
   const data = await res.json();
   return { accessToken: data.access_token };
 }
+
+/**
+ * Register a new user via the backend /auth/register endpoint.
+ * Public self-registration is forced to the sales role by the backend.
+ * Throws an Error with a `status` property on failure (e.g. 409 duplicate).
+ */
+export async function registerWithBackend(
+  username: string,
+  password: string,
+  full_name: string,
+): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/api/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, full_name }),
+    cache: 'no-store'
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err = new Error(data.detail || `注册失败: ${res.status}`) as Error & {
+      status?: number;
+    };
+    err.status = res.status;
+    throw err;
+  }
+}
