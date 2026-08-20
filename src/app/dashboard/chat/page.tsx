@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -42,6 +49,8 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   useCreateSession,
   useDeleteSession,
@@ -727,8 +736,13 @@ function MessageBubble({ msg }: { msg: MessageResponse }) {
         }`}
       >
         <div className='whitespace-pre-wrap text-sm'>
-          {renderAnswerWithCitations(msg.content, (n) =>
-            setActiveSource(`src-${n - 1}`)
+          {isUser ? (
+            msg.content
+          ) : (
+            <MarkdownMessage
+              content={msg.content}
+              onCite={(n) => setActiveSource(`src-${n - 1}`)}
+            />
           )}
         </div>
         {!isUser && msg.sources && msg.sources.length > 0 && (
@@ -808,32 +822,108 @@ function SourcesAccordion({
   );
 }
 
-/** 将回答中的 [n] 引用标记渲染为可点击徽标（线B⑦ 引用溯源）。
+/**
+ * 助手消息渲染为 Markdown（支持工具生成的表格/链接/代码），同时把
+ * `[n]` 引用标记转为可点击徽标（线B⑦ 引用溯源）。
  *
- * 点击 [n] 触发 onCite(n)，由调用方展开对应来源条目（值 `src-${n-1}`）。
- * 仅匹配 `[数字]`，如 "[可选]" 之类的中括号文本不受影响。
+ * 仅对代码块之外的内容做 `[n] -> [n](#cite-n)` 转换，避免 CSV/JSON 等
+ * 代码块里的 `[n]` 被误当成引用链接。
  */
-function renderAnswerWithCitations(
-  content: string,
-  onCite: (n: number) => void
-) {
-  const parts = content.split(/(\[\d+\])/g);
-  return parts.map((part, i) => {
-    const match = part.match(/^\[(\d+)\]$/);
-    if (match) {
-      const n = Number(match[1]);
-      return (
-        <button
-          key={i}
-          type='button'
-          onClick={() => onCite(n)}
-          title={`查看引用来源 ${n}`}
-          className='mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded bg-primary/15 px-1 align-middle font-mono text-[10px] text-primary hover:bg-primary/30'
-        >
-          {match[1]}
-        </button>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
+function preprocessCitations(content: string): string {
+  const parts = content.split(/(```[\s\S]*?```)/g);
+  return parts
+    .map((part) => {
+      if (part.startsWith('```')) return part;
+      return part.replace(/\[(\d+)\]/g, (_m, n) => `[${n}](#cite-${n})`);
+    })
+    .join('');
+}
+
+/** 供 Markdown 渲染器读取"点击引用徽标"回调（模块级组件避免嵌套组件定义）。 */
+const CiteContext = createContext<(n: number) => void>(() => {});
+
+function MarkdownLink({
+  href,
+  children
+}: {
+  href?: string;
+  children?: ReactNode;
+}) {
+  const onCite = useContext(CiteContext);
+  if (href && href.startsWith('#cite-')) {
+    const n = Number(href.slice('#cite-'.length));
+    return (
+      <button
+        type='button'
+        onClick={() => onCite(n)}
+        title={`查看引用来源 ${n}`}
+        className='mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded bg-primary/15 px-1 align-middle font-mono text-[10px] text-primary hover:bg-primary/30'
+      >
+        {String(children)}
+      </button>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target='_blank'
+      rel='noopener noreferrer'
+      className='text-primary underline'
+    >
+      {children}
+    </a>
+  );
+}
+
+function MarkdownTable({ children }: { children?: ReactNode }) {
+  return (
+    <table className='my-2 w-full border-collapse border border-border text-xs'>
+      {children}
+    </table>
+  );
+}
+
+function MarkdownTh({ children }: { children?: ReactNode }) {
+  return (
+    <th className='border border-border bg-muted px-2 py-1 text-left font-medium'>
+      {children}
+    </th>
+  );
+}
+
+function MarkdownTd({ children }: { children?: ReactNode }) {
+  return <td className='border border-border px-2 py-1'>{children}</td>;
+}
+
+function MarkdownCode({ children }: { children?: ReactNode }) {
+  return (
+    <code className='rounded bg-muted px-1 py-0.5 font-mono text-xs'>
+      {children}
+    </code>
+  );
+}
+
+function MarkdownMessage({
+  content,
+  onCite
+}: {
+  content: string;
+  onCite: (n: number) => void;
+}) {
+  return (
+    <CiteContext.Provider value={onCite}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: MarkdownLink,
+          table: MarkdownTable,
+          th: MarkdownTh,
+          td: MarkdownTd,
+          code: MarkdownCode
+        }}
+      >
+        {preprocessCitations(content)}
+      </ReactMarkdown>
+    </CiteContext.Provider>
+  );
 }
