@@ -90,6 +90,14 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['n', 'n'],
         items: []
+      },
+      {
+        title: '销售6阶段看板',
+        url: '/dashboard/sales/pipeline',
+        icon: 'trendingUp',
+        isActive: false,
+        shortcut: ['s', 'p'],
+        items: []
       }
     ]
   },
@@ -133,6 +141,30 @@ export const navGroups: NavGroup[] = [
         title: '目标完成率',
         url: '/dashboard/targets/completion',
         icon: 'trendingUp',
+        isActive: false,
+        items: [],
+        access: { role: 'manager' }
+      },
+      {
+        title: '目标树',
+        url: '/dashboard/targets/tree',
+        icon: 'forms',
+        isActive: false,
+        items: [],
+        access: { role: 'manager' }
+      },
+      {
+        title: '培训记录',
+        url: '/dashboard/training',
+        icon: 'book',
+        isActive: false,
+        items: [],
+        access: { role: 'manager' }
+      },
+      {
+        title: '绩效考核',
+        url: '/dashboard/performance',
+        icon: 'badgeCheck',
         isActive: false,
         items: [],
         access: { role: 'manager' }

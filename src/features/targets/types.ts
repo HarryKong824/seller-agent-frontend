@@ -8,6 +8,8 @@ export interface TargetResponse {
   ownerFullName: string | null;
   setById: number;
   managerId: number | null;
+  parentTargetId: number | null;
+  objective: string | null;
   year: number;
   periodType: PeriodType;
   periodIndex: number;
@@ -105,3 +107,13 @@ export const PERIOD_TYPE_LABELS: Record<PeriodType, string> = {
   quarter: '季',
   week: '周'
 };
+
+
+/** 目标树节点(层级拆解视图:年度→季度→月度→周度) */
+export interface TargetTreeNode {
+  target: TargetResponse;
+  children: TargetTreeNode[];
+}
+
+/** 周期类型含 year (用于年度目标) */
+export type PeriodTypeWithYear = PeriodType | 'year';

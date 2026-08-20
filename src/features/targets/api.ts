@@ -7,6 +7,7 @@ import type {
   TargetCompletionResponse,
   TargetCreateInput,
   TargetResponse,
+  TargetTreeNode,
   TargetUpdateInput
 } from './types';
 
@@ -178,5 +179,35 @@ export function useDeleteTarget() {
       void qc.invalidateQueries({ queryKey: ['targets'] });
       void qc.invalidateQueries({ queryKey: ['target-completion'] });
     }
+  });
+}
+
+
+/** 目标树(年度→季度→月度→周度层级视图)。 */
+export async function fetchTargetTree(params: {
+  ownerId?: number | null;
+  year?: number | null;
+  managerId?: number | null;
+} = {}): Promise<TargetTreeNode[]> {
+  const qs = new URLSearchParams();
+  if (params.ownerId) qs.set('owner_id', String(params.ownerId));
+  if (params.year) qs.set('year', String(params.year));
+  if (params.managerId) qs.set('manager_id', String(params.managerId));
+  const res = await fetch(`/api/targets/tree?${qs.toString()}`, { cache: 'no-store' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `获取目标树失败: ${res.status}`);
+  }
+  return res.json();
+}
+
+export function useTargetTree(params: {
+  ownerId?: number | null;
+  year?: number | null;
+  managerId?: number | null;
+} = {}) {
+  return useQuery({
+    queryKey: ['target-tree', params.ownerId ?? 'all', params.year ?? 'all', params.managerId ?? 'all'],
+    queryFn: () => fetchTargetTree(params)
   });
 }

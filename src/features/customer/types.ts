@@ -113,22 +113,36 @@ export const STATUS_LABELS: Record<string, string> = {
   churned: '流失'
 };
 
-/** 线B③ 商机阶段中文标签（与后端 STAGE_LABELS 镜像） */
+/** 6 阶段销售过程(2026-08-20 扩展, DECISIONS #37) - 与后端 STAGE_LABELS 镜像 */
 export const STAGE_LABELS: Record<string, string> = {
   lead: '线索',
-  qualified: '商机确认',
-  proposal: '方案报价',
+  qualified: '需求确认',
+  proposal: '方案呈现',
   negotiation: '商务谈判',
-  won: '赢单',
+  won: '已签约',
+  delivered: '交付验收',
+  ongoing: '持续经营',
   lost: '丢单'
 };
 
-/** 商机阶段固定顺序（用于漏斗/分布展示） */
+/** 商机阶段固定顺序(6阶段+终态) */
 export const STAGE_ORDER: string[] = [
   'lead',
   'qualified',
   'proposal',
   'negotiation',
   'won',
+  'delivered',
+  'ongoing',
   'lost'
+];
+
+/** 在途(未关闭)阶段:参与在途金额统计 */
+export const OPEN_STAGES: string[] = [
+  'lead',
+  'qualified',
+  'proposal',
+  'negotiation',
+  'delivered',
+  'ongoing'
 ];
